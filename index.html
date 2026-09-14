@@ -413,32 +413,57 @@ function isSevenPairs258(concealed){
   return Object.keys(c).some(k=>is258Key(k) && c[k]>=2);
 }
 
+// 碰碰胡检测：4组刻子+1对，有副露也可以
+function isPengPeng(concealed, melds, pairKey){
+  // 检查所有组是否都是刻子（3张或杠算刻子）
+  const c=countHand(concealed);
+  // 排除pairKey
+  const rest={...c}; delete rest[pairKey];
+  for(const [k,n] of Object.entries(rest)){
+    if(n<3 && n%3!==0 && n!==4 && n%3!==1) return false;
+    // 必须是3张一组（刻子）或4张（杠，也算刻子）
+    if(n===1||n===2||n===5) return false; // 不可能构成刻子
+    if(n>4) return false;
+    if(n===3||n===4) continue; // 可以是刻子
+    return false;
+  }
+  // 副露都是刻子
+  if(melds.some(m=>m.type==='chi')) return false;
+  return true;
+}
+
 // 主胡牌判定
 // concealed: 暗手牌(已含胡的那张, 共14-3M张)；melds: 副露数组
 function checkWin(concealed, melds){
   const allTiles=[...concealed, ...melds.flat()];
   if(allTiles.length===0) return {win:false};
 
-  // 1. 风一色：全部为字牌（且能构成有效4组+1对）
+  // 1. 风一色：全部为字牌（豁免258将）
   if(allTiles.every(t=>t.suit==='zi')){
-    if(findAnyPair(concealed)) return {win:true,type:'special',name:'风一色',fan:16};
+    if(findAnyPair(concealed)) return {win:true,type:'special',name:'风一色',fan:10};
   }
-  // 2. 将一色：全部为2/5/8序数牌
+  // 2. 将一色：全部为2/5/8序数牌（豁免258将）
   if(allTiles.every(t=>is258(t))){
-    if(findAnyPair(concealed)) return {win:true,type:'special',name:'将一色',fan:12};
+    if(findAnyPair(concealed)) return {win:true,type:'special',name:'将一色',fan:7};
   }
   // 3. 豪华七对（无副露，7对且含四张）
   if(melds.length===0 && isLuxurySevenPairs(concealed))
-    return {win:true,type:'special',name:'豪华七对',fan:8};
+    return {win:true,type:'special',name:'豪华七对',fan:7};
   // 4. 十三不靠（无副露）
   if(melds.length===0 && isShisanBukao(concealed))
-    return {win:true,type:'special',name:'十三不靠',fan:12};
-  // 5. 普通七对（7对子、无四张），需含258将，计为普通胡
+    return {win:true,type:'special',name:'十三不靠',fan:7};
+  // 5. 普通七对（7对子、无四张），需含258将，计4番
   if(melds.length===0 && isSevenPairs258(concealed))
-    return {win:true,type:'normal',name:'七对(258将)',fan:2};
+    return {win:true,type:'normal',name:'七对(258将)',fan:4};
   // 6. 普通胡：4组+258将
   const pair=find258Pair(concealed);
-  if(pair) return {win:true,type:'normal',name:'普通胡(258将)',fan:1,pair};
+  if(pair){
+    // 碰碰胡：4组刻子+1对258将
+    if(isPengPeng(concealed, melds, pair)){
+      return {win:true,type:'normal',name:'碰碰胡(258将)',fan:2,pair,pengpeng:true};
+    }
+    return {win:true,type:'normal',name:'普通胡(258将)',fan:1,pair};
+  }
   // 能成牌但无258将 → 济南麻将不能胡
   return {win:false,reason:'no258'};
 }
@@ -579,7 +604,7 @@ function handleFlowers(p){
 // 花胡
 function triggerHuaHu(p){
   // 花胡计为自摸胡，base fan=8（triggerWin 还会加上花数与杠数）
-  triggerWin(p, p, 'zimo', {win:true,type:'special',name:'花胡',fan:8});
+  triggerWin(p, p, 'zimo', {win:true,type:'special',name:'花胡',fan:7});
 }
 
 /* ============ 五、摸牌后逻辑 ============ */
@@ -893,48 +918,76 @@ function nextPlayerDraw(discarder){
   setTimeout(()=>afterDraw(p,false),400);
 }
 
-/* ============ 八、胡牌结算 ============ */
+/* ============ 八、胡牌结算（完整济南麻将计分） ============ */
+// 底花计算：花牌×1 + 杠花（数牌明杠+1/暗杠+2，字牌明杠+2/暗杠+3）+ 风碰×1
+function calcBaseHua(player){
+  let hua = player.flowers.length; // 花牌每张+1
+  player.melds.forEach(m=>{
+    if(m.type==='kong'){
+      // 杠花区分字牌/数牌、明/暗
+      const tile = m.tiles[0];
+      const isZi = tile.suit==='zi';
+      const isAn = m.kind==='an';
+      if(isZi){ hua += isAn?3:2; }  // 字牌：暗杠+3，明杠+2
+      else     { hua += isAn?2:1; }  // 数牌：暗杠+2，明杠+1（含补杠）
+    }
+    if(m.type==='pong'){
+      // 风碰+1花（东南西北）
+      const tile = m.tiles[0];
+      if(tile.suit==='zi' && ['E','S','W','N'].includes(tile.value)){
+        hua += 1;
+      }
+    }
+  });
+  return hua;
+}
+
 function triggerWin(winner, payer, mode, winInfo){
   // mode: zimo / dianpao / gangshangkaihua / qiangang
-  // 计番
-  let fan=winInfo.fan;
   const w=G.players[winner];
-  // 杠上开花 +4 番
-  if(mode==='gangshangkaihua') fan+=4;
-  if(mode==='qiangang') fan+=4;
-  // 花牌数加番
-  fan += w.flowers.length;
-  // 杠数加番（明杠1，暗杠2，补杠1）
-  w.melds.forEach(m=>{ if(m.type==='kong'){ fan += (m.kind==='an'?2:1); } });
-  // 明楼翻倍
-  if(w.isMinglou) fan*=2;
-  // 起底番
-  const base=fan;
+  // 底花
+  const baseHua = calcBaseHua(w);
+  // 番数累乘
+  let fan = winInfo.fan; // 基础番（平胡1/碰碰胡2/七对4/豪华七对7/花胡7/将一色7/风一色10/十三不靠7）
+  if(mode==='gangshangkaihua') fan += 2;  // 杠上开花 +2 番
+  if(mode==='qiangang') fan += 2;          // 抢杠胡 +2 番
+  // 明楼胡：得分×2（在倍率阶段处理）
 
-  // 分配分数
+  // 最终得分 = 底花 × 番数
+  const unit = Math.max(1, baseHua * fan);
+
   let detail=[];
+  let modeName={zimo:'自摸',dianpao:'点炮',gangshangkaihua:'杠上开花',qiangang:'抢杠胡'}[mode];
+
   if(mode==='zimo'||mode==='gangshangkaihua'||mode==='qiangang'){
-    // 自摸 / 杠上开花 / 抢杠胡：其余三家各付 base 分（抢杠胡按规则判定为自摸）
+    // 自摸系：其余三家各付
     for(let i=0;i<4;i++){
       if(i===winner) continue;
-      const pay=base;
+      let pay=unit;
+      // 明楼胡 ×2
+      if(w.isMinglou) pay*=2;
+      // 被赔者是庄家 ×2
+      if(i===G.dealer) pay*=2;
       G.roundScores[i]-=pay;
       G.roundScores[winner]+=pay;
       detail.push(`${pname(i)} -${pay}`);
     }
   } else {
-    // 点炮/抢杠：放炮者赔付全部
-    let pay=base*3;
-    // 若放炮者为明楼状态，输分翻倍
+    // 点炮：放炮者独赔
+    let pay=unit*3;
+    // 明楼胡 ×2
+    if(w.isMinglou) pay*=2;
+    // 放炮者为庄家 ×2
+    if(payer===G.dealer) pay*=2;
+    // 放炮者为明楼状态，输分×2
     if(G.players[payer].isMinglou) pay*=2;
     G.roundScores[payer]-=pay;
     G.roundScores[winner]+=pay;
     detail.push(`${pname(payer)} -${pay}（放炮）`);
   }
-  let modeName={zimo:'自摸',dianpao:'点炮',gangshangkaihua:'杠上开花',qiangang:'抢杠胡'}[mode];
   if(w.isMinglou) modeName+='（明楼翻倍）';
-  logMsg(`${pname(winner)} ${modeName} · ${winInfo.name} · ${base}番`,'lt-win');
-  finishRound(winner, mode, winInfo.name, base, modeName, detail);
+  logMsg(`${pname(winner)} ${modeName} · ${winInfo.name} · 底花${baseHua} × ${fan}番 = ${unit} 单位`,'lt-win');
+  finishRound(winner, mode, winInfo.name, fan, modeName, detail);
 }
 
 // 一炮多响
@@ -1110,95 +1163,148 @@ function clearActionButtons(){
   G.pendingSelfWin=null;
 }
 
-/* ===== 传统麻将牌面 SVG ===== */
-// 每个 size 对应 viewBox
+/* ===== 广东麻将标准牌面 SVG ===== */
 const TILE_VB = { big:'0 0 52 72', med:'0 0 36 50', sm:'0 0 28 40' };
 
-// 万子：中心大字 + 角标数字
+// 万子：上黑下红楷体「X萬」
 function svgMan(val, size){
   const vb=TILE_VB[size];
   const n=['一','二','三','四','五','六','七','八','九'][val-1];
-  // 万子字体颜色：传统黑色 + 角标红色
+  const fsTop=size==='big'?26:size==='med'?18:14;
+  const fsBot=size==='big'?16:size==='med'?11:8;
   return `<svg viewBox="${vb}" class="face-svg">
-    <text x="50%" y="48%" text-anchor="middle" dominant-baseline="middle" font-size="${size==='big'?26:size==='med'?18:14}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="800" fill="#1a1a1a">${n}</text>
-    <text x="50%" y="78%" text-anchor="middle" font-size="${size==='big'?13:size==='med'?9:7}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">万</text>
-    <text x="10%" y="18%" text-anchor="middle" font-size="${size==='big'?9:size==='med'?6:5}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">${val}</text>
-    <text x="90%" y="92%" text-anchor="middle" font-size="${size==='big'?9:size==='med'?6:5}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">${val}</text>
+    <text x="50%" y="44%" text-anchor="middle" dominant-baseline="middle" font-size="${fsTop}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="800" fill="#1a1a1a">${n}</text>
+    <text x="50%" y="80%" text-anchor="middle" dominant-baseline="middle" font-size="${fsBot}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="800" fill="#c62828">萬</text>
   </svg>`;
 }
-// 条子：竹节纵向排列
-function svgTiao(val, size){
-  const vb=TILE_VB[size];
-  const sw=size==='big'?2.5:size==='med'?1.8:1.3;
-  const topGap=size==='big'?8:size==='med'?5:4;
-  const cx=50;
-  const baseY=size==='big'?62:size==='med'?43:34;
-  const gapY=size==='big'?10:size==='med'?7:5.5;
-  if(val===1){
-    return `<svg viewBox="${vb}" class="face-svg">
-      <ellipse cx="${cx}" cy="38" rx="14" ry="10" fill="#2e7d32"/>
-      <path d="M${cx-14} 38 Q${cx-20} 45 ${cx-10} 55 Q${cx-5} 48 ${cx} 44" stroke="#2e7d32" stroke-width="2.5" fill="none"/>
-      <circle cx="${cx+8}" cy="33" r="2.5" fill="#fff"/>
-      <circle cx="${cx+8}" cy="33" r="1.2" fill="#1a1a1a"/>
-      <path d="M${cx+12} 36 L${cx+18} 34 L${cx+12} 38" fill="#ff9800"/>
-    </svg>`;
-  }
-  const cols={2:2,3:3,4:2,5:2,6:3,7:3,8:3,9:3};
-  const rows={2:1,3:1,4:2,5:2,6:2,7:2,8:3,9:3};
-  const p={2:[0,1],3:[0,1,2],4:[0,0,1,1],5:[0,0,1,1,2],6:[0,1,2,0,1],7:[0,1,2,0,1,2],8:[0,1,2,0,1,2,0],9:[0,1,2,0,1,2,0,1,2]};
-  const C=cols[val], R=rows[val], pos=p[val];
-  let circles='';
-  for(let i=0;i<val;i++){
-    const row=pos[i]; const col=i%C;
-    const totalW=C*(sw*3); const startX=cx-totalW/2+sw*1.5;
-    const yBot=baseY-(R-1)*gapY;
-    const y=yBot+row*gapY;
-    const x=startX+col*(sw*3);
-    circles += `<line x1="${x}" y1="${y-topGap}" x2="${x}" y2="${y+topGap}" stroke="#2e7d32" stroke-width="${sw}" stroke-linecap="round"/>`;
-    circles += `<line x1="${x-sw*1.5}" y1="${y-topGap-1}" x2="${x+sw*1.5}" y2="${y-topGap-1}" stroke="#1b5e20" stroke-width="${sw*0.7}" stroke-linecap="round"/>`;
-    circles += `<line x1="${x-sw*1.5}" y1="${y+topGap+1}" x2="${x+sw*1.5}" y2="${y+topGap+1}" stroke="#1b5e20" stroke-width="${sw*0.7}" stroke-linecap="round"/>`;
-  }
-  return `<svg viewBox="${vb}" class="face-svg">${circles}</svg>`;
-}
-// 饼子：圆圈点阵
+
+// 饼子：经典圆圈点阵
+// 一筒：大红圈 + 绿内圈 + 中心点
+// 2-9：绿色圆圈点阵
 function svgBing(val, size){
   const vb=TILE_VB[size];
-  const r=size==='big'?5:size==='med'?3.5:2.5;
-  const gap=size==='big'?10:size==='med'?7:5.5;
-  const positions={
-    1:[[0,0]],
-    2:[[-1,-1],[1,1]],
-    3:[[-1,-1],[0,0],[1,1]],
-    4:[[-1,-1],[1,-1],[-1,1],[1,1]],
-    5:[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
-    6:[[-1,-1],[0,-1],[1,-1],[-1,1],[0,1],[1,1]],
-    7:[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[-1,1],[0,1]],
-    8:[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]],
-    9:[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]],
+  const r=size==='big'?4.5:size==='med'?3.2:2.4;
+  const cx=size==='big'?26:size==='med'?18:14;
+  const cy_top=size==='big'?22:size==='med'?15:12;
+  const cy_mid=size==='big'?36:size==='med'?25:20;
+  const cy_bot=size==='big'?50:size==='med'?35:28;
+  const gx=size==='big'?10:size==='med'?7:5;
+  const green='#2e7d32', red='#c62828';
+
+  // 一筒：大红圈+绿内圈+中心红点
+  if(val===1){
+    const br=size==='big'?12:size==='med'?8.5:6.5;
+    const ir=size==='big'?7:size==='med'?5:3.8;
+    const pr=size==='big'?2.2:size==='med'?1.5:1.2;
+    return `<svg viewBox="${vb}" class="face-svg">
+      <circle cx="50%" cy="50%" r="${br}" fill="none" stroke="${red}" stroke-width="${size==='big'?3:2}"/>
+      <circle cx="50%" cy="50%" r="${ir}" fill="none" stroke="${green}" stroke-width="${size==='big'?2:1.5}"/>
+      <circle cx="50%" cy="50%" r="${pr}" fill="${red}"/>
+    </svg>`;
+  }
+
+  // 各筒子圆圈坐标（2-9）
+  const layouts={
+    2:[[cx-gx,cy_top],[cx+gx,cy_bot]],
+    3:[[cx-gx,cy_top],[cx,cy_mid],[cx+gx,cy_bot]],
+    4:[[cx-gx,cy_top],[cx+gx,cy_top],[cx-gx,cy_bot],[cx+gx,cy_bot]],
+    5:[[cx-gx,cy_top],[cx+gx,cy_top],[cx,cy_mid],[cx-gx,cy_bot],[cx+gx,cy_bot]],
+    6:[[cx-gx,cy_top],[cx,cy_top],[cx+gx,cy_top],[cx-gx,cy_bot],[cx,cy_bot],[cx+gx,cy_bot]],
+    7:[[cx-gx,cy_top],[cx,cy_top],[cx+gx,cy_top],[cx-gx,cy_mid],[cx,cy_mid],[cx-gx,cy_bot],[cx,cy_bot]],
+    8:[[cx-gx,cy_top],[cx,cy_top],[cx+gx,cy_top],[cx-gx,cy_mid],[cx+gx,cy_mid],[cx-gx,cy_bot],[cx,cy_bot],[cx+gx,cy_bot]],
+    9:[[cx-gx,cy_top],[cx,cy_top],[cx+gx,cy_top],[cx-gx,cy_mid],[cx,cy_mid],[cx+gx,cy_mid],[cx-gx,cy_bot],[cx,cy_bot],[cx+gx,cy_bot]],
   };
-  const centers=positions[val];
+  const pts=layouts[val];
   let circles='';
-  centers.forEach(([dx,dy])=>{
-    const x=50+dx*gap; const y=(size==='big'?30:size==='med'?21:17)+dy*gap*0.85;
-    circles += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#1565c0" stroke-width="${size==='big'?2:1.4}"/>`;
-    circles += `<circle cx="${x}" cy="${y}" r="${r*0.45}" fill="#1565c0"/>`;
+  pts.forEach(([x,y],i)=>{
+    // 5筒中间那个用红色
+    const col=(val===5 && i===2)?red:green;
+    circles += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${col}" stroke-width="${size==='big'?1.8:1.3}"/>`;
+    circles += `<circle cx="${x}" cy="${y}" r="${r*0.45}" fill="${col}"/>`;
   });
   return `<svg viewBox="${vb}" class="face-svg">${circles}</svg>`;
 }
-// 字牌
-const HONOR_SVG={
-  'E':'东','S':'南','W':'西','N':'北','C':'中','F':'發','P':'白'
-};
-const HONOR_COLOR={'E':'#1565c0','S':'#2e7d32','W':'#6a1b1a','N':'#424242','C':'#c62828','F':'#2e7d32','P':'#546e7a'};
+
+// 条子：2/4/6/8纯绿，3/5/7/9间隔红绿
+function svgTiao(val, size){
+  const vb=TILE_VB[size];
+  const sw=size==='big'?2.8:size==='med'?2:1.4;
+  const ts=size==='big'?6:size==='med'?4.5:3.5; // 节间距
+  const bh=size==='big'?6:size==='med'?4.5:3.5;  // 节宽度
+  const green='#2e7d32', red='#c62828';
+
+  // 1条：绿色鸟形（简化为弯竹）
+  if(val===1){
+    const cx=size==='big'?26:size==='med'?18:14;
+    return `<svg viewBox="${vb}" class="face-svg">
+      <ellipse cx="${cx}" cy="${size==='big'?34:size==='med'?24:19}" rx="${size==='big'?13:size==='med'?9:7}" ry="${size==='big'?9:size==='med'?6:5}" fill="${green}"/>
+      <path d="M${cx-size==='big'?13:size==='med'?9:7} ${size==='big'?34:size==='med'?24:19} Q${cx-size==='big'?18:size==='med'?12:9} ${size==='big'?42:size==='med'?30:24} ${cx-size==='big'?8:size==='med'?5:4} ${size==='big'?52:size==='med'?37:30}" stroke="${green}" stroke-width="${sw}" fill="none"/>
+      <circle cx="${cx+size==='big'?8:size==='med'?5:4}" cy="${size==='big'?29:size==='med'?20:16}" r="${size==='big'?2.5:size==='med'?1.8:1.3}" fill="#fff"/>
+      <circle cx="${cx+size==='big'?8:size==='med'?5:4}" cy="${size==='big'?29:size==='med'?20:16}" r="${size==='big'?1.2:size==='med'?0.9:0.6}" fill="#1a1a1a"/>
+      <path d="M${cx+size==='big'?12:size==='med'?8:6} ${size==='big'?32:size==='med'?22:18} L${cx+size==='big'?18:size==='med'?12:9} ${size==='big'?30:size==='med'?21:17} L${cx+size==='big'?12:size==='med'?8:6} ${size==='big'?34:size==='med'?24:19}" fill="#ff9800"/>
+    </svg>`;
+  }
+
+  // 竹节排列：2-9列布局 + 红绿颜色
+  // 列布局: 2→2列, 3→3列, 4→2×2, 5→2+2+1, 6→2×3, 7→2+3+2, 8→3+2+3, 9→3×3
+  // 行布局决定颜色：偶数行纯绿，奇数行间隔红绿
+  const layouts={
+    2:[0,1], 3:[0,1,2], 4:[0,0,1,1], 5:[0,0,1,1,2],
+    6:[0,1,2,0,1,2], 7:[0,1,2,0,1,2,0], 8:[0,1,2,0,1,2,0,1], 9:[0,1,2,0,1,2,0,1,2]
+  };
+  const rows={2:1,3:1,4:2,5:2,6:2,7:2,8:3,9:3};
+  const cols={2:2,3:3,4:2,5:2,6:3,7:3,8:3,9:3};
+  const pos=layouts[val], R=rows[val], C=cols[val];
+  const cx=size==='big'?26:size==='med'?18:14;
+  const topY=size==='big'?14:size==='med'?10:8;
+  const rowGap=size==='big'?10:size==='med'?7:5.5;
+  const colGap=size==='big'?10:size==='med'?7:5.5;
+
+  let result='';
+  for(let i=0;i<val;i++){
+    const col=pos[i]%C;
+    const row=Math.floor(i/C);
+    const x=cx - ((C-1)*colGap)/2 + col*colGap;
+    const y=topY + row*rowGap;
+    // 颜色：偶数竹节绿，奇数（3/5/7/9的奇数位置）红
+    const col_is_red = (val>=3) && ((i%2)===1); // 第2、4、6、8根竹节红色
+    const col_color = col_is_red?red:green;
+    // 竹节：竖线 + 上下两个节环
+    result += `<line x1="${x}" y1="${y}" x2="${x}" y2="${y+ts*2}" stroke="${col_color}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    result += `<line x1="${x-bh/2}" y1="${y}" x2="${x+bh/2}" y2="${y}" stroke="${col_color}" stroke-width="${sw*0.9}" stroke-linecap="round"/>`;
+    result += `<line x1="${x-bh/2}" y1="${y+ts*2}" x2="${x+bh/2}" y2="${y+ts*2}" stroke="${col_color}" stroke-width="${sw*0.9}" stroke-linecap="round"/>`;
+    // 中间节环（3节竹）
+    if(val>=4){
+      result += `<line x1="${x-bh/2}" y1="${y+ts}" x2="${x+bh/2}" y2="${y+ts}" stroke="${col_color}" stroke-width="${sw*0.8}" stroke-linecap="round"/>`;
+    }
+  }
+  return `<svg viewBox="${vb}" class="face-svg">${result}</svg>`;
+}
+
+// 字牌：北/南/東/西黑；中红；發绿；白方框
 function svgHonor(val, size){
   const vb=TILE_VB[size];
-  const n=HONOR_SVG[val]; const c=HONOR_COLOR[val]||'#1a1a1a';
   const fs=size==='big'?36:size==='med'?24:18;
+  const COLORS={E:'#1a1a1a',S:'#1a1a1a',W:'#1a1a1a',N:'#1a1a1a',C:'#c62828',F:'#2e7d32',P:'#1a1a1a'};
+  const CHARTS={E:'東',S:'南',W:'西',N:'北',C:'中',F:'發',P:'白'};
+  const col=COLORS[val]||'#1a1a1a';
+  const ch=CHARTS[val]||'?';
+
+  if(val==='P'){
+    // 白板：方框
+    const bw=size==='big'?34:size==='med'?23:17;
+    const th=size==='big'?2:size==='med'?1.5:1.2;
+    return `<svg viewBox="${vb}" class="face-svg">
+      <rect x="${size==='big'?9:size==='med'?6:4.5}" y="${size==='big'?14:size==='med'?10:8}" width="${bw}" height="${size==='big'?44:size==='med'?30:23}" fill="none" stroke="${col}" stroke-width="${th}"/>
+      <rect x="${size==='big'?13:size==='med'?9:7}" y="${size==='big'?18:size==='med'?12:9.5}" width="${size==='big'?26:size==='med'?18:13.5}" height="${size==='big'?36:size==='med'?24:18}" fill="none" stroke="${col}" stroke-width="${th*0.7}"/>
+    </svg>`;
+  }
   return `<svg viewBox="${vb}" class="face-svg">
-    <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-family="'KaiTi','STKaiti','SimHei',serif" font-weight="800" fill="${c}">${n}</text>
+    <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-family="'KaiTi','STKaiti','SimHei',serif" font-weight="800" fill="${col}">${ch}</text>
   </svg>`;
 }
-// 花牌
+
+// 花牌：保留 emoji + 中文标签
 const HUA_EMOJI={spring:'🌸',summer:'☀️',autumn:'🍁',winter:'❄️',plum:'🍃',orchid:'🌿',bamboo:'🎋',chrysanthemum:'🌼'};
 function svgFlower(val, size){
   const vb=TILE_VB[size];
