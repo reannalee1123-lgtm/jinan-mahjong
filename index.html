@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>山东济南麻将 · 258将</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ===== 麻将牌通用样式 ===== */
+  .tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:linear-gradient(180deg,#fdfcf7 0%,#efe8d6 100%);
+    border:1px solid #c9bfa6;border-radius:5px 5px 4px 4px;
+    box-shadow:0 2px 3px rgba(0,0,0,.15),inset 0 1px 0 #fff;
+    user-select:none;font-weight:700;cursor:default;line-height:1}
+  .tile.big{width:44px;height:62px}
+  .tile.big .num{font-size:19px}
+  .tile.big .suit{font-size:14px;margin-top:2px}
+  .tile.big.honor{font-size:24px}
+  .tile.big.flower{font-size:21px}
+  .tile.med{width:32px;height:46px}
+  .tile.med .num{font-size:13px}
+  .tile.med .suit{font-size:10px;margin-top:1px}
+  .tile.med.honor{font-size:16px}
+  .tile.med.flower{font-size:14px}
+  .tile.sm{width:26px;height:38px}
+  .tile.sm .num{font-size:11px}
+  .tile.sm .suit{font-size:8px;margin-top:1px}
+  .tile.sm.honor{font-size:13px}
+  .tile.sm.flower{font-size:12px}
+  /* 花色配色 */
+  .c-man{color:#1a1a1a}
+  .c-tiao{color:#2e7d32}
+  .c-bing{color:#1565c0}
+  .c-E{color:#1565c0}.c-S{color:#2e7d32}.c-W{color:#6a1b1a}.c-N{color:#424242}
+  .c-C{color:#c62828}.c-F{color:#2e7d32}.c-P{color:#90a4ae}
+  .c-hua{color:#c2185b}
+  /* 牌背 */
+  .tile.back{background:repeating-linear-gradient(45deg,#3d6b5a,#3d6b5a 4px,#2d5144 4px,#2d5144 8px);
+    border-color:#1f3a30;color:transparent}
+  .tile.back::after{content:'';position:absolute;inset:3px;border:1px solid rgba(255,255,255,.25);border-radius:3px}
+  /* 可交互 */
+  .tile.sel:hover{transform:translateY(-6px);box-shadow:0 8px 12px rgba(0,0,0,.25);cursor:pointer}
+  .tile.sel.sel-on{transform:translateY(-10px);box-shadow:0 10px 16px rgba(0,0,0,.3);outline:2px solid #b8956a}
+  .tile.last{outline:2px solid #c0463a;outline-offset:1px}
+  .tile.ming{outline:2px solid #3d6b5a}
+  /* 横向手牌 */
+  .hand-row{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
+  .meld-row{display:flex;gap:2px}
+  .meld{display:flex;gap:2px;padding:2px 3px;background:rgba(61,107,90,.08);border-radius:5px;border:1px dashed rgba(61,107,90,.3)}
+  /* 玩家区域 */
+  .seat{background:linear-gradient(180deg,#fff,#f7f7f5);border:1px solid #e5e5e0;border-radius:12px;padding:8px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .seat.active{border-color:#3d6b5a;box-shadow:0 0 0 2px rgba(61,107,90,.25),0 4px 12px rgba(0,0,0,.08)}
+  .seat.dealer::before{content:'庄';position:absolute;top:-8px;left:-8px;width:20px;height:20px;background:#b8956a;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .badge{display:inline-flex;align-items:center;gap:2px;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600}
+  .b-ting{background:#e8f0ec;color:#2d5144;border:1px solid #3d6b5a}
+  .b-ming{background:#f5efe3;color:#8a6a3a;border:1px solid #b8956a}
+  .b-hua{background:#fce4ec;color:#c2185b;border:1px solid #e91e63}
+  /* 按钮 */
+  .act-btn{padding:8px 14px;border-radius:8px;font-weight:700;font-size:14px;border:1px solid #d0c8b5;background:#fff;color:#1c1c1e;transition:all .12s;cursor:pointer}
+  .act-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.12)}
+  .act-btn:disabled{opacity:.35;cursor:not-allowed}
+  .act-btn.win{background:#c0463a;color:#fff;border-color:#a93a30}
+  .act-btn.kong{background:#b8956a;color:#fff;border-color:#a07a52}
+  .act-btn.pong{background:#3d6b5a;color:#fff;border-color:#2d5144}
+  .act-btn.chi{background:#1565c0;color:#fff;border-color:#0d4f9e}
+  .act-btn.ming{background:#6a1b1a;color:#fff}
+  /* 日志 */
+  #log{font-size:12px;line-height:1.7;color:#4a4a4a;font-family:ui-monospace,Menlo,monospace}
+  #log .lt-self{color:#3d6b5a}
+  #log .lt-win{color:#c0463a;font-weight:700}
+  #log .lt-act{color:#1565c0}
+  #log .lt-sys{color:#b8956a;font-weight:600}
+  /* 弹窗 */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#fff;border-radius:16px;padding:24px;max-width:480px;width:92%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  /* 杠竖排 */
+  .meld.kong-meld .tile.med:nth-child(4){transform:translate(-12px,-10px) rotate(0);margin-right:-12px}
+  .meld.kong-meld{padding-right:6px}
+  /* 旋转区域 */
+  .rot-l{transform:rotate(0)}
+  .player-info{font-size:12px}
+</style>
+</head>
+<body class="bg-neutral-800 text-neutral-900 min-h-screen">
+
+<!-- 顶部标题栏 -->
+<header class="bg-[#1c1c1e] text-white px-5 py-3 flex items-center justify-between shadow-md">
+  <div>
+    <h1 class="text-xl font-bold tracking-wide">山东济南麻将 · 258将</h1>
+    <p class="text-xs text-neutral-400 mt-0.5">单文件版 · 必须有2/5/8将牌 · 支持明楼/抢杠胡/杠上开花/一炮多响</p>
+  </div>
+  <div class="flex gap-2">
+    <button id="btnNewRound" class="px-3 py-1.5 text-sm bg-[#3d6b5a] rounded-md hover:bg-[#2d5144]">新一局</button>
+    <button id="btnReset" class="px-3 py-1.5 text-sm bg-neutral-700 rounded-md hover:bg-neutral-600">重置游戏</button>
+    <button id="btnFriend" class="px-3 py-1.5 text-sm bg-[#b8956a] rounded-md hover:bg-[#a07a52]">邀请微信好友</button>
+  </div>
+</header>
+
+<!-- 主棋盘 -->
+<main class="max-w-[1400px] mx-auto p-4 grid grid-cols-[1fr_280px] gap-4">
+
+  <!-- 左：棋盘 -->
+  <section class="bg-[#f0ebe0] rounded-xl p-3 shadow-inner" style="min-height:640px">
+    <!-- 顶部玩家2 -->
+    <div class="flex justify-center mb-2">
+      <div id="seat-2" class="seat relative" style="width:520px"></div>
+    </div>
+
+    <!-- 中部：左玩家 + 桌面中心 + 右玩家 -->
+    <div class="flex items-center justify-between gap-2 my-2">
+      <div id="seat-3" class="seat relative" style="width:240px"></div>
+      <div id="center" class="flex-1 bg-[#e6dfca] rounded-lg p-3 min-h-[180px] flex flex-col items-center justify-center gap-2">
+        <div class="text-xs text-neutral-500" id="centerStatus">点击「新一局」开始</div>
+        <div id="discardPool" class="flex flex-wrap gap-1 justify-center max-w-md"></div>
+        <div id="pendingTile" class="mt-1"></div>
+      </div>
+      <div id="seat-1" class="seat relative" style="width:240px"></div>
+    </div>
+
+    <!-- 底部玩家0（真人） -->
+    <div class="mt-2">
+      <div id="seat-0" class="seat relative active"></div>
+    </div>
+  </section>
+
+  <!-- 右：操作与日志 -->
+  <aside class="flex flex-col gap-3">
+    <!-- 操作按钮 -->
+    <div class="bg-white rounded-xl p-3 shadow">
+      <div class="text-xs text-neutral-500 mb-2 font-semibold">操作面板</div>
+      <div id="actionPanel" class="flex flex-wrap gap-2">
+        <button class="act-btn win" data-act="win" disabled>胡</button>
+        <button class="act-btn kong" data-act="kong" disabled>杠</button>
+        <button class="act-btn pong" data-act="pong" disabled>碰</button>
+        <button class="act-btn chi" data-act="chi" disabled>吃</button>
+        <button class="act-btn ming" data-act="minglou" disabled>明楼</button>
+        <button class="act-btn" data-act="pass" disabled>过</button>
+      </div>
+      <p class="text-[11px] text-neutral-400 mt-2" id="actionHint">等待你的回合...</p>
+    </div>
+    <!-- 局势信息 -->
+    <div class="bg-white rounded-xl p-3 shadow text-xs">
+      <div class="font-semibold mb-1.5 text-neutral-600">本局信息</div>
+      <div id="roundInfo" class="space-y-1 text-neutral-700"></div>
+    </div>
+    <!-- 日志 -->
+    <div class="bg-white rounded-xl p-3 shadow flex-1 flex flex-col" style="min-height:200px">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-semibold text-neutral-600">对局日志</span>
+        <button id="btnClearLog" class="text-[10px] text-neutral-400 hover:text-neutral-700">清空</button>
+      </div>
+      <div id="log" class="flex-1 overflow-auto pr-1" style="max-height:300px"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- 结算/提示弹窗 -->
+<div id="modalMask" class="modal-mask hidden">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+/* ============================================================================
+   山东济南麻将 · 单文件实现
+   核心规则：胡牌必须含 2/5/8 将牌对子；特殊大胡牌型绕过将牌限制
+   ============================================================================ */
+
+/* ============ 一、牌定义与牌库 ============ */
+// 牌花色：man万 / tiao条 / bing饼 / zi字 / hua花
+const SUITED = ['man','tiao','bing'];
+const ZI_VALS = ['E','S','W','N','C','F','P'];   // 东南西北中发白
+const HUA_VALS = ['spring','summer','autumn','winter','plum','orchid','bamboo','chrysanthemum']; // 春夏秋冬梅兰竹菊
+const NUM_CN = ['一','二','三','四','五','六','七','八','九'];
+const ZI_NAME = {E:'东',S:'南',W:'西',N:'北',C:'中',F:'发',P:'白'};
+const HUA_NAME = {spring:'春',summer:'夏',autumn:'秋',winter:'冬',plum:'梅',orchid:'兰',bamboo:'竹',chrysanthemum:'菊'};
+const SEAT_WIND = ['东','南','西','北'];
+
+// 牌名/显示
+function tileLabel(t){
+  if(!t) return '';
+  if(t.suit==='man')  return NUM_CN[t.value-1]+'万';
+  if(t.suit==='tiao') return NUM_CN[t.value-1]+'条';
+  if(t.suit==='bing') return NUM_CN[t.value-1]+'饼';
+  if(t.suit==='zi')   return ZI_NAME[t.value];
+  if(t.suit==='hua')  return HUA_NAME[t.value];
+}
+// 牌的键值（用于计数）
+function tileKey(t){ return t.suit+'_'+t.value; }
+// 是否序数牌
+function isSuited(t){ return t.suit==='man'||t.suit==='tiao'||t.suit==='bing'; }
+// 是否258牌（万/条/饼的2/5/8）
+function is258(t){ return isSuited(t) && (t.value===2||t.value===5||t.value===8); }
+function is258Key(k){ const [s,v]=k.split('_'); return SUITED.includes(s) && (v==='2'||v==='5'||v==='8'); }
+
+// 构建144张牌库
+function buildDeck(){
+  const deck=[]; let id=0;
+  SUITED.forEach(s=>{ for(let v=1;v<=9;v++){ for(let i=0;i<4;i++) deck.push({id:id++,suit:s,value:v}); } });
+  ZI_VALS.forEach(v=>{ for(let i=0;i<4;i++) deck.push({id:id++,suit:'zi',value:v}); });
+  HUA_VALS.forEach(v=>deck.push({id:id++,suit:'hua',value:v}));
+  return deck; // 108+28+8 = 144
+}
+// 洗牌
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* ============ 二、胡牌判定核心 ============ */
+// 计数手牌
+function countHand(hand){ const c={}; hand.forEach(t=>{c[tileKey(t)]=(c[tileKey(t)]||0)+1;}); return c; }
+// 排序键（同花色按数值）
+function sortedKeys(c){ return Object.keys(c).filter(k=>c[k]>0).sort((a,b)=>keyCmp(a,b)); }
+function keyCmp(a,b){ const [sa,va]=a.split('_'),[sb,vb]=b.split('_'); const so={man:0,tiao:1,bing:2,zi:3,hua:4}; if(so[sa]!==so[sb]) return so[sa]-so[sb]; const na=isNaN(+va)?va.charCodeAt(0):+va, nb=isNaN(+vb)?vb.charCodeAt(0):+vb; return (na>nb?1:(na<nb?-1:0)); }
+function isSuitedKey(k){ return SUITED.includes(k.split('_')[0]); }
+
+// 递归判定剩余牌能否全部拆成刻子或顺子
+function canFormMelds(c){
+  const keys=sortedKeys(c);
+  if(keys.length===0) return true;
+  const k=keys[0];
+  // 刻子
+  if(c[k]>=3){ c[k]-=3; if(canFormMelds(c)){c[k]+=3;return true;} c[k]+=3; }
+  // 顺子（仅序数牌）
+  if(isSuitedKey(k)){
+    const [s,v]=k.split('_'); const num=+v;
+    if(num<=7){
+      const k2=s+'_'+(num+1), k3=s+'_'+(num+2);
+      if((c[k2]||0)>0 && (c[k3]||0)>0){
+        c[k]--;c[k2]--;c[k3]--;
+        if(canFormMelds(c)){c[k]++;c[k2]++;c[k3]++;return true;}
+        c[k]++;c[k2]++;c[k3]++;
+      }
+    }
+  }
+  return false;
+}
+
+// 寻找任一有效"4组+1对"分解，返回该对子键
+function findAnyPair(concealed){
+  const c=countHand(concealed);
+  for(const pk of sortedKeys(c)){
+    if(c[pk]>=2){
+      c[pk]-=2;
+      const ok=canFormMelds(c);
+      c[pk]+=2;
+      if(ok) return pk;
+    }
+  }
+  return null;
+}
+// 寻找258将分解
+function find258Pair(concealed){
+  const c=countHand(concealed);
+  for(const pk of sortedKeys(c)){
+    if(is258Key(pk) && c[pk]>=2){
+      c[pk]-=2;
+      const ok=canFormMelds(c);
+      c[pk]+=2;
+      if(ok) return pk;
+    }
+  }
+  return null;
+}
+
+// 十三不靠：14张全部互不关联（无对、无顺、无刻）
+function isShisanBukao(tiles){
+  if(tiles.length!==14) return false;
+  const keys=tiles.map(tileKey);
+  if(new Set(keys).size!==14) return false; // 必须全部不同
+  // 同花色序数牌之间数值差须>2
+  const bySuit={};
+  tiles.forEach(t=>{ if(isSuited(t)){ (bySuit[t.suit]=bySuit[t.suit]||[]).push(t.value); } });
+  for(const s in bySuit){
+    const v=bySuit[s].sort((a,b)=>a-b);
+    for(let i=0;i<v.length;i++) for(let j=i+1;j<v.length;j++) if(v[j]-v[i]<=2) return false;
+  }
+  return true;
+}
+
+// 豪华七对：7对子且至少一组为4张
+function isLuxurySevenPairs(concealed){
+  const c=countHand(concealed);
+  const groups=Object.values(c);
+  if(groups.length===0) return false;
+  const allEven=groups.every(n=>n%2===0);
+  const totalPairs=groups.reduce((s,n)=>s+Math.floor(n/2),0);
+  const has4=groups.some(n=>n>=4);
+  return allEven && totalPairs===7 && has4;
+}
+// 普通七对（7对子、无四张），且至少一对为258将
+function isSevenPairs258(concealed){
+  const c=countHand(concealed);
+  const groups=Object.values(c);
+  if(groups.length===0) return false;
+  const allEven=groups.every(n=>n%2===0);
+  const totalPairs=groups.reduce((s,n)=>s+Math.floor(n/2),0);
+  if(!allEven || totalPairs!==7) return false;
+  if(groups.some(n=>n>=4)) return false; // 含四张则属豪华七对
+  return Object.keys(c).some(k=>is258Key(k) && c[k]>=2);
+}
+
+// 主胡牌判定
+// concealed: 暗手牌(已含胡的那张, 共14-3M张)；melds: 副露数组
+function checkWin(concealed, melds){
+  const allTiles=[...concealed, ...melds.flat()];
+  if(allTiles.length===0) return {win:false};
+
+  // 1. 风一色：全部为字牌（且能构成有效4组+1对）
+  if(allTiles.every(t=>t.suit==='zi')){
+    if(findAnyPair(concealed)) return {win:true,type:'special',name:'风一色',fan:16};
+  }
+  // 2. 将一色：全部为2/5/8序数牌
+  if(allTiles.every(t=>is258(t))){
+    if(findAnyPair(concealed)) return {win:true,type:'special',name:'将一色',fan:12};
+  }
+  // 3. 豪华七对（无副露，7对且含四张）
+  if(melds.length===0 && isLuxurySevenPairs(concealed))
+    return {win:true,type:'special',name:'豪华七对',fan:8};
+  // 4. 十三不靠（无副露）
+  if(melds.length===0 && isShisanBukao(concealed))
+    return {win:true,type:'special',name:'十三不靠',fan:12};
+  // 5. 普通七对（7对子、无四张），需含258将，计为普通胡
+  if(melds.length===0 && isSevenPairs258(concealed))
+    return {win:true,type:'normal',name:'七对(258将)',fan:2};
+  // 6. 普通胡：4组+258将
+  const pair=find258Pair(concealed);
+  if(pair) return {win:true,type:'normal',name:'普通胡(258将)',fan:1,pair};
+  // 能成牌但无258将 → 济南麻将不能胡
+  return {win:false,reason:'no258'};
+}
+
+// 听牌判定：13张暗手是否差1张胡
+function isTing(hand, melds){
+  // 枚举所有可能的第14张
+  for(const s of [...SUITED,'zi']){
+    const vals = isSuitedKey(s+'_1') ? [1,2,3,4,5,6,7,8,9] : ZI_VALS;
+    for(const v of vals){
+      const key=s+'_'+v;
+      const cnt = hand.filter(t=>tileKey(t)===key).length;
+      if(cnt>=4) continue;
+      const test=[...hand,{suit:s,value:v,id:-1}];
+      const r=checkWin(test,melds);
+      if(r.win) return true;
+    }
+  }
+  return false;
+}
+// 摸牌后(14张)是否为听牌：能否弃掉某张使剩余13张听牌
+function isTingAfterDraw(hand14, melds){
+  const tried=new Set();
+  for(let i=0;i<hand14.length;i++){
+    const k=tileKey(hand14[i]);
+    if(tried.has(k)) continue; // 同款弃出结果相同
+    tried.add(k);
+    const h13=hand14.filter((_,j)=>j!==i);
+    if(isTing(h13, melds)) return true;
+  }
+  return false;
+}
+// 列出听哪些牌
+function tingList(hand, melds){
+  const list=[];
+  for(const s of SUITED){
+    for(let v=1;v<=9;v++){
+      const cnt=hand.filter(t=>t.suit===s&&t.value===v).length;
+      if(cnt>=4) continue;
+      const test=[...hand,{suit:s,value:v,id:-1}];
+      if(checkWin(test,melds).win) list.push({suit:s,value:v});
+    }
+  }
+  for(const v of ZI_VALS){
+    const cnt=hand.filter(t=>t.suit==='zi'&&t.value===v).length;
+    if(cnt>=4) continue;
+    const test=[...hand,{suit:'zi',value:v,id:-1}];
+    if(checkWin(test,melds).win) list.push({suit:'zi',value:v});
+  }
+  return list;
+}
+
+/* ============ 三、游戏状态 ============ */
+const G = {
+  players:[], wall:[], deadwall:[], dealer:0, round:1, currentPlayer:0,
+  phase:'idle', // dealing/await-discard/await-action/over
+  lastDiscard:null, discardedBy:-1, isFirstTurn:true,
+  log:[], humanSelected:null, pendingActions:[], actionResolver:null,
+  roundScores:[0,0,0,0], // 本局分数变化
+  consecutiveDealer:0,
+};
+function pname(p){ return G.players[p].name; }
+function logMsg(msg, cls=''){
+  G.log.push({msg,cls});
+  const el=document.getElementById('log');
+  el.innerHTML += `<div class="${cls}">${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+function statusMsg(msg){ document.getElementById('centerStatus').textContent=msg; }
+
+// 初始化玩家
+function initPlayers(){
+  G.players=[
+    {id:0,name:'你',isHuman:true,hand:[],melds:[],flowers:[],discards:[],isDealer:false,isMinglou:false,isTing:false,isBot:false},
+    {id:1,name:'AI·小济',isHuman:false,hand:[],melds:[],flowers:[],discards:[],isDealer:false,isMinglou:false,isTing:false,isBot:true},
+    {id:2,name:'AI·大明湖',isHuman:false,hand:[],melds:[],flowers:[],discards:[],isDealer:false,isMinglou:false,isTing:false,isBot:true},
+    {id:3,name:'AI·趵突泉',isHuman:false,hand:[],melds:[],flowers:[],discards:[],isDealer:false,isMinglou:false,isTing:false,isBot:true},
+  ];
+}
+
+/* ============ 四、发牌与补花 ============ */
+function newRound(keepDealer){
+  // 清理上一局
+  G.players.forEach(p=>{p.hand=[];p.melds=[];p.flowers=[];p.discards=[];p.isMinglou=false;p.isTing=false;});
+  G.wall=shuffle(buildDeck());
+  G.lastDiscard=null;G.discardedBy=-1;G.isFirstTurn=true;
+  G.roundScores=[0,0,0,0];G.pendingActions=[];
+
+  // 确定庄家
+  if(!keepDealer){
+    G.dealer=Math.floor(Math.random()*4);
+  }
+  G.players.forEach((p,i)=>{p.isDealer=(i===G.dealer);});
+  logMsg(`<span class="lt-sys">===== 第 ${G.round} 局 =====</span>`);
+  logMsg(`庄家：${pname(G.dealer)}（${SEAT_WIND[G.dealer]}家）`,'lt-sys');
+
+  // 发牌：每人13张，庄家14张
+  for(let i=0;i<13;i++) for(let p=0;p<4;p++) G.players[p].hand.push(G.wall.pop());
+  G.players[G.dealer].hand.push(G.wall.pop());
+  // 排序手牌
+  G.players.forEach(p=>sortHand(p));
+  // 补花
+  for(let p=0;p<4;p++){ handleFlowers(p); if(G.phase==='over') return; }
+
+  G.currentPlayer=G.dealer;
+  G.phase='await-discard';
+  render();
+  statusMsg(`庄家 ${pname(G.dealer)} 起手行牌`);
+  // 庄家先动
+  setTimeout(()=>afterDraw(G.dealer,false),500);
+}
+
+function sortHand(p){ p.hand.sort((a,b)=>keyCmp(tileKey(a),tileKey(b))); }
+function handleFlowers(p){
+  const player=G.players[p];
+  let found=true;
+  while(found){
+    found=false;
+    for(let i=0;i<player.hand.length;i++){
+      if(player.hand[i].suit==='hua'){
+        const f=player.hand.splice(i,1)[0];
+        player.flowers.push(f);
+        const repl=G.wall.pop();
+        player.hand.push(repl);
+        sortHand(player);
+        logMsg(`${pname(p)} 补花 ${tileLabel(f)}（已 ${player.flowers.length} 张花）`,'lt-act');
+        // 花胡判定
+        if(player.flowers.length>=7){
+          triggerHuaHu(p);
+          return;
+        }
+        found=true; break;
+      }
+    }
+  }
+}
+
+// 花胡
+function triggerHuaHu(p){
+  // 花胡计为自摸胡，base fan=8（triggerWin 还会加上花数与杠数）
+  triggerWin(p, p, 'zimo', {win:true,type:'special',name:'花胡',fan:8});
+}
+
+/* ============ 五、摸牌后逻辑 ============ */
+// p 摸了一张牌后调用（庄家首手或正常摸牌或杠后补牌）
+function afterDraw(p, fromKong){
+  if(G.phase==='over') return;
+  const player=G.players[p];
+  const win=checkWin(player.hand, player.melds);
+  if(player.isHuman){
+    // 人类：若可自摸胡，交给玩家选择（点「胡」确认，或弃牌放弃）
+    G.phase='await-discard';
+    G.humanSelected=null;
+    G.pendingSelfWin = win.win ? {win, fromKong} : null;
+    const kongable=findKongable(player);
+    const ting=isTingAfterDraw(player.hand, player.melds);
+    player.isTing=ting;
+    render();
+    let hint='请选择一张牌打出';
+    if(win.win) hint='可自摸胡！点「胡」确认，或弃牌放弃';
+    if(win.reason==='no258') hint='已可成牌但缺258将，不能胡，需调整';
+    if(kongable.length && !win.win) hint+='，或点「杠」';
+    if(ting && !win.win) hint+='，或点「明楼」';
+    document.getElementById('actionHint').textContent=hint;
+    setBtn('win', !!win.win);
+    setBtn('kong', kongable.length>0 && !win.win);
+    setBtn('minglou', ting && !player.isMinglou && !win.win);
+    setBtn('pong',false);setBtn('chi',false);setBtn('pass',false);
+  } else {
+    // AI：可胡则直接胡
+    if(win.win){ triggerWin(p,p, fromKong?'gangshangkaihua':'zimo', win); return; }
+    const kongable=findKongable(player);
+    const ting=isTingAfterDraw(player.hand, player.melds);
+    player.isTing=ting;
+    setTimeout(()=>aiAfterDraw(p, kongable, ting, fromKong), 700);
+  }
+}
+
+// 找可杠的牌（暗杠4张相同 / 补杠已碰的牌）
+function findKongable(player){
+  const res=[];
+  // 暗杠：手牌中4张相同
+  const c=countHand(player.hand);
+  for(const k in c){ if(c[k]===4){ const [s,v]=k.split('_'); res.push({kind:'an',key:k,suit:s,value:isNaN(+v)?v:+v}); } }
+  // 补杠：已碰的牌，手中有第4张
+  player.melds.forEach((m,i)=>{
+    if(m.type==='pong'){
+      const t=m.tiles[0];
+      if(player.hand.some(h=>tileKey(h)===tileKey(t))){
+        res.push({kind:'bu',meldIdx:i,key:tileKey(t),suit:t.suit,value:t.value});
+      }
+    }
+  });
+  return res;
+}
+
+/* ============ 六、出牌与碰/吃/杠响应 ============ */
+function doDiscard(p, tile){
+  const player=G.players[p];
+  const idx=player.hand.indexOf(tile);
+  if(idx<0) return;
+  player.hand.splice(idx,1);
+  player.discards.push(tile);
+  G.lastDiscard=tile; G.discardedBy=p;
+  logMsg(`${pname(p)} 打出 ${tileLabel(tile)}`,'lt-self');
+  render();
+  // 检查其他玩家的吃碰杠胡
+  setTimeout(()=>checkActionsOnDiscard(tile,p), 300);
+}
+
+function checkActionsOnDiscard(tile, discarder){
+  const actions=[];
+  for(let i=1;i<=3;i++){
+    const p=(discarder+i)%4;
+    const player=G.players[p];
+    // 胡（明楼者不可点炮胡）
+    if(!player.isMinglou){
+      const win=checkWin([...player.hand, tile], player.melds);
+      if(win.win) actions.push({p,type:'win',win});
+    }
+    // 杠（大明杠：手中有3张同款）
+    if(countTileInHand(player,tile)>=3) actions.push({p,type:'kong',tile});
+    // 碰
+    if(countTileInHand(player,tile)>=2) actions.push({p,type:'pong',tile});
+    // 吃（仅下家）
+    if(i===1){
+      const chis=getChiOptions(player,tile);
+      if(chis.length) actions.push({p,type:'chi',chis});
+    }
+  }
+  if(actions.length===0){
+    // 没人要，下家摸牌
+    nextPlayerDraw(discarder);
+    return;
+  }
+  // 优先级处理：胡>杠>碰>吃
+  const wins=actions.filter(a=>a.type==='win');
+  if(wins.length>0){
+    // 一炮多响：所有可胡者全部胡
+    triggerMultiWin(discarder, wins);
+    return;
+  }
+  const kongs=actions.filter(a=>a.type==='kong');
+  if(kongs.length){
+    const k=kongs[0];
+    promptAction(k.p,[k],'杠');
+    return;
+  }
+  const pongs=actions.filter(a=>a.type==='pong');
+  if(pongs.length){
+    promptAction(pongs[0].p,[pongs[0]],'碰');
+    return;
+  }
+  const chis=actions.filter(a=>a.type==='chi');
+  if(chis.length){
+    promptAction(chis[0].p,[chis[0]],'吃');
+    return;
+  }
+}
+
+function countTileInHand(player,tile){
+  return player.hand.filter(h=>tileKey(h)===tileKey(tile)).length;
+}
+// 吃牌组合：返回可能的两张组合
+function getChiOptions(player,tile){
+  if(!isSuited(tile)) return [];
+  const v=tile.value, s=tile.suit;
+  const opts=[];
+  // 形如 [tile, v-2, v-1] [tile,v-1,v+1] [tile,v+1,v+2]
+  const has=(val)=>player.hand.some(h=>h.suit===s&&h.value===val);
+  if(v>=3 && has(v-2)&&has(v-1)) opts.push([v-2,v-1]);
+  if(v>=2&&v<=8 && has(v-1)&&has(v+1)) opts.push([v-1,v+1]);
+  if(v<=7 && has(v+1)&&has(v+2)) opts.push([v+1,v+2]);
+  return opts;
+}
+
+// 弹出操作选项（玩家或AI）
+function promptAction(p, options, label){
+  const player=G.players[p];
+  if(player.isHuman){
+    G.phase='await-action';
+    G.pendingActions=options;
+    render();
+    const hint=`${pname(p)}可${label}，请选择`;
+    document.getElementById('actionHint').textContent=hint;
+    // 启用按钮
+    options.forEach(o=>{
+      if(o.type==='win') setBtn('win',true);
+      if(o.type==='kong') setBtn('kong',true);
+      if(o.type==='pong') setBtn('pong',true);
+      if(o.type==='chi') setBtn('chi',true);
+    });
+    setBtn('pass',true); // 可放弃
+    G.actionResolver=(act)=>resolveAction(p, act, options);
+  } else {
+    // AI 决定（先清掉人类按钮，避免误操作）
+    clearActionButtons();
+    setTimeout(()=>{
+      const take=aiDecideAction(p, options);
+      if(take) resolveAction(p, take.type, options);
+      else nextPlayerDraw(G.discardedBy); // AI放弃
+    }, 800);
+  }
+}
+function resolveAction(p, actType, options){
+  const opt=options.find(o=>o.type===actType);
+  if(!opt){ // 过
+    nextPlayerDraw(G.discardedBy);
+    return;
+  }
+  if(opt.type==='win'){
+    triggerWin(p, G.discardedBy, 'dianpao', opt.win);
+    return;
+  }
+  if(opt.type==='kong'){
+    doMingKong(p, opt.tile);
+    return;
+  }
+  if(opt.type==='pong'){
+    doPong(p, opt.tile);
+    return;
+  }
+  if(opt.type==='chi'){
+    // 多组合时取第一个（简化）
+    doChi(p, opt.tile, opt.chis[0]);
+    return;
+  }
+}
+
+/* ============ 七、吃/碰/杠执行 ============ */
+function doPong(p, tile){
+  const player=G.players[p];
+  // 从手中移除2张
+  const removed=[];
+  for(let i=0;i<2;i++){ const idx=player.hand.findIndex(h=>tileKey(h)===tileKey(tile)); removed.push(player.hand.splice(idx,1)[0]); }
+  player.melds.push({type:'pong',tiles:[...removed, tile],from:G.discardedBy});
+  logMsg(`${pname(p)} 碰 ${tileLabel(tile)}`,'lt-act');
+  G.lastDiscard=null;
+  // 碰牌者需打出一张
+  afterClaim(p);
+}
+function doChi(p, tile, pair){
+  const player=G.players[p];
+  const [a,b]=pair;
+  const t1=player.hand.findIndex(h=>h.suit===tile.suit&&h.value===a);
+  const r1=player.hand.splice(t1,1)[0];
+  const t2=player.hand.findIndex(h=>h.suit===tile.suit&&h.value===b);
+  const r2=player.hand.splice(t2,1)[0];
+  player.melds.push({type:'chi',tiles:[r1,r2,tile],from:G.discardedBy});
+  logMsg(`${pname(p)} 吃 ${tileLabel(r1)}${tileLabel(r2)}${tileLabel(tile)}`,'lt-act');
+  G.lastDiscard=null;
+  afterClaim(p);
+}
+function doMingKong(p, tile){
+  // 大明杠：手中3张+刚打出的1张
+  const player=G.players[p];
+  const removed=[];
+  for(let i=0;i<3;i++){ const idx=player.hand.findIndex(h=>tileKey(h)===tileKey(tile)); removed.push(player.hand.splice(idx,1)[0]); }
+  player.melds.push({type:'kong',tiles:[...removed,tile],from:G.discardedBy,kind:'ming'});
+  logMsg(`${pname(p)} 明杠 ${tileLabel(tile)}`,'lt-act');
+  G.lastDiscard=null;
+  // 杠后补牌
+  setTimeout(()=>drawReplacement(p,true),400);
+}
+function doAnKong(p, opt){
+  const player=G.players[p];
+  const removed=[];
+  for(let i=0;i<4;i++){ const idx=player.hand.findIndex(h=>tileKey(h)===opt.key); removed.push(player.hand.splice(idx,1)[0]); }
+  player.melds.push({type:'kong',tiles:removed,from:p,kind:'an'});
+  logMsg(`${pname(p)} 暗杠 ${tileLabel(removed[0])}`,'lt-act');
+  // 抢杠胡只对补杠生效，暗杠不可抢
+  setTimeout(()=>drawReplacement(p,true),400);
+}
+function doBuGang(p, opt){
+  const player=G.players[p];
+  // 从手中移除1张
+  const idx=player.hand.findIndex(h=>tileKey(h)===opt.key);
+  const tile=player.hand.splice(idx,1)[0];
+  // 升级碰为杠
+  const meld=player.melds[opt.meldIdx];
+  // 抢杠胡判定：若其他玩家可胡该牌
+  for(let i=1;i<=3;i++){
+    const op=(p+i)%4;
+    const opp=G.players[op];
+    if(opp.isMinglou) continue;
+    const win=checkWin([...opp.hand, tile], opp.melds);
+    if(win.win){
+      // 抢杠胡！判定为自摸
+      logMsg(`${pname(op)} 抢杠胡 ${tileLabel(tile)}！`,'lt-win');
+      triggerWin(op, p, 'qiangang', win);
+      return;
+    }
+  }
+  meld.type='kong'; meld.tiles.push(tile); meld.kind='bu';
+  logMsg(`${pname(p)} 补杠 ${tileLabel(tile)}`,'lt-act');
+  setTimeout(()=>drawReplacement(p,true),400);
+}
+
+// 杠/补花后摸牌
+function drawReplacement(p, fromKong){
+  if(G.wall.length===0){ endRound('draw'); return; }
+  let tile=G.wall.pop();
+  // 若是花牌，补花
+  while(tile.suit==='hua'){
+    G.players[p].flowers.push(tile);
+    logMsg(`${pname(p)} 杠后补花 ${tileLabel(tile)}`,'lt-act');
+    if(G.players[p].flowers.length>=7){ triggerHuaHu(p); return; }
+    if(G.wall.length===0){ endRound('draw'); return; }
+    tile=G.wall.pop();
+  }
+  G.players[p].hand.push(tile);
+  sortHand(G.players[p]);
+  // 杠上开花判定
+  afterDraw(p, fromKong);
+}
+
+// 碰/吃后需打出一张
+function afterClaim(p){
+  const player=G.players[p];
+  sortHand(player);
+  if(player.isHuman){
+    G.phase='await-discard';
+    G.humanSelected=null;
+    render();
+    document.getElementById('actionHint').textContent='请打出一张牌';
+    setBtn('kong',false);setBtn('pong',false);setBtn('chi',false);setBtn('pass',false);setBtn('minglou',false);setBtn('win',false);
+  } else {
+    setTimeout(()=>{
+      const d=aiChooseDiscard(player);
+      doDiscard(p,d);
+    },600);
+  }
+}
+
+// 下家摸牌
+function nextPlayerDraw(discarder){
+  if(G.phase==='over') return;
+  if(G.wall.length===0){ endRound('draw'); return; }
+  G.currentPlayer=(discarder+1)%4;
+  const p=G.currentPlayer;
+  let tile=G.wall.pop();
+  while(tile.suit==='hua'){
+    G.players[p].flowers.push(tile);
+    logMsg(`${pname(p)} 摸到花牌 ${tileLabel(tile)}，补牌`,'lt-act');
+    if(G.players[p].flowers.length>=7){ triggerHuaHu(p); return; }
+    if(G.wall.length===0){ endRound('draw'); return; }
+    tile=G.wall.pop();
+  }
+  G.players[p].hand.push(tile);
+  sortHand(G.players[p]);
+  render();
+  setTimeout(()=>afterDraw(p,false),400);
+}
+
+/* ============ 八、胡牌结算 ============ */
+function triggerWin(winner, payer, mode, winInfo){
+  // mode: zimo / dianpao / gangshangkaihua / qiangang
+  // 计番
+  let fan=winInfo.fan;
+  const w=G.players[winner];
+  // 杠上开花 +4 番
+  if(mode==='gangshangkaihua') fan+=4;
+  if(mode==='qiangang') fan+=4;
+  // 花牌数加番
+  fan += w.flowers.length;
+  // 杠数加番（明杠1，暗杠2，补杠1）
+  w.melds.forEach(m=>{ if(m.type==='kong'){ fan += (m.kind==='an'?2:1); } });
+  // 明楼翻倍
+  if(w.isMinglou) fan*=2;
+  // 起底番
+  const base=fan;
+
+  // 分配分数
+  let detail=[];
+  if(mode==='zimo'||mode==='gangshangkaihua'||mode==='qiangang'){
+    // 自摸 / 杠上开花 / 抢杠胡：其余三家各付 base 分（抢杠胡按规则判定为自摸）
+    for(let i=0;i<4;i++){
+      if(i===winner) continue;
+      const pay=base;
+      G.roundScores[i]-=pay;
+      G.roundScores[winner]+=pay;
+      detail.push(`${pname(i)} -${pay}`);
+    }
+  } else {
+    // 点炮/抢杠：放炮者赔付全部
+    let pay=base*3;
+    // 若放炮者为明楼状态，输分翻倍
+    if(G.players[payer].isMinglou) pay*=2;
+    G.roundScores[payer]-=pay;
+    G.roundScores[winner]+=pay;
+    detail.push(`${pname(payer)} -${pay}（放炮）`);
+  }
+  let modeName={zimo:'自摸',dianpao:'点炮',gangshangkaihua:'杠上开花',qiangang:'抢杠胡'}[mode];
+  if(w.isMinglou) modeName+='（明楼翻倍）';
+  logMsg(`${pname(winner)} ${modeName} · ${winInfo.name} · ${base}番`,'lt-win');
+  finishRound(winner, mode, winInfo.name, base, modeName, detail);
+}
+
+// 一炮多响
+function triggerMultiWin(discarder, wins){
+  logMsg(`一炮多响！${wins.map(w=>pname(w.p)).join('、')} 同时胡！`,'lt-win');
+  wins.forEach(w=>{
+    triggerWin(w.p, discarder, 'dianpao', w.win);
+    if(G.phase==='over') return;
+  });
+}
+
+function finishRound(winner, mode, name, fan, modeName, detail){
+  G.phase='over';
+  // 庄家连庄/轮庄
+  let nextDealer;
+  if(mode==='draw'){
+    nextDealer=(G.dealer+1)%4;
+  } else if(winner===G.dealer){
+    nextDealer=G.dealer; // 连庄
+  } else {
+    nextDealer=(G.dealer+1)%4;
+  }
+  G.nextDealer=nextDealer; // 供「新一局」按钮使用
+  showSettlement(winner, mode, name, fan, modeName, detail, nextDealer);
+}
+
+function endRound(reason){
+  // 荒庄流局
+  logMsg('牌墙已尽，流局荒庄','lt-sys');
+  G.phase='over';
+  const nextDealer=(G.dealer+1)%4;
+  G.nextDealer=nextDealer;
+  showSettlement(-1,'draw','荒庄',0,'荒庄流局',[],nextDealer);
+}
+
+function showSettlement(winner, mode, name, fan, modeName, detail, nextDealer){
+  const scores=G.roundScores;
+  const box=document.getElementById('modalBox');
+  const isDraw = (winner===-1);
+  box.innerHTML=`
+    <div class="text-center mb-3">
+      <div class="text-2xl font-bold ${isDraw?'text-neutral-700':'text-[#c0463a]'}">${isDraw?'荒庄流局':pname(winner)+' 胡牌！'}</div>
+      ${isDraw?'':`<div class="text-sm text-neutral-500 mt-1">${modeName} · ${name} · ${fan}番</div>`}
+    </div>
+    <div class="space-y-1.5 mb-4">
+      ${G.players.map((p,i)=>`
+        <div class="flex justify-between items-center px-3 py-2 rounded-lg ${i===winner?'bg-red-50':'bg-neutral-50'}">
+          <span>${pname(i)}${i===G.dealer?' (庄)':''}${p.isMinglou?' [明楼]':''}</span>
+          <span class="font-bold ${scores[i]>0?'text-[#c0463a]':scores[i]<0?'text-[#3d6b5a]':'text-neutral-500'}">${scores[i]>0?'+':''}${scores[i]}</span>
+        </div>
+      `).join('')}
+    </div>
+    ${detail&&detail.length?`<div class="text-xs text-neutral-500 mb-3">${detail.join(' / ')}</div>`:''}
+    <div class="text-xs text-neutral-400 mb-3">下局庄家：${pname(nextDealer)}（${SEAT_WIND[nextDealer]}家）${nextDealer===G.dealer?'（连庄）':''}</div>
+    <div class="flex gap-2">
+      <button id="btnNextRound" class="flex-1 py-2.5 bg-[#3d6b5a] text-white rounded-lg font-semibold hover:bg-[#2d5144]">下一局</button>
+      <button id="btnCloseModal" class="px-4 py-2.5 bg-neutral-200 text-neutral-700 rounded-lg font-semibold hover:bg-neutral-300">查看牌局</button>
+    </div>
+  `;
+  document.getElementById('modalMask').classList.remove('hidden');
+  document.getElementById('btnNextRound').onclick=()=>{
+    document.getElementById('modalMask').classList.add('hidden');
+    G.dealer=nextDealer; // 连庄则保持，轮庄则下家
+    G.round++;
+    newRound(true); // 保留已设定的庄家
+  };
+  document.getElementById('btnCloseModal').onclick=()=>{
+    document.getElementById('modalMask').classList.add('hidden');
+  };
+}
+
+/* ============ 九、AI 行为 ============ */
+function aiAfterDraw(p, kongable, ting, fromKong){
+  const player=G.players[p];
+  // 1. 听牌且手牌较强 → 明楼
+  if(ting && !player.isMinglou && !fromKong){
+    const fan=estimateFan(player);
+    if(fan>=4 && Math.random()<0.55){
+      player.isMinglou=true;
+      logMsg(`${pname(p)} 明楼！`,'lt-win');
+      render();
+    }
+  }
+  // 2. 暗杠/补杠（保守：手牌少于2副露时倾向杠）
+  if(kongable.length){
+    const k=kongable[0];
+    // 抢杠风险：补杠可能被抢，若该牌危险则跳过
+    if(k.kind==='bu' && isDangerousForBuGang(p,k)){
+      // 跳过
+    } else {
+      if(k.kind==='an') doAnKong(p,k);
+      else doBuGang(p,k);
+      return;
+    }
+  }
+  // 3. 选牌打出
+  const d=aiChooseDiscard(player);
+  doDiscard(p,d);
+}
+function isDangerousForBuGang(p,k){
+  // 简化：若有人明楼，则补杠有风险
+  return G.players.some((pl,i)=>i!==p&&pl.isMinglou);
+}
+// 估算潜在番数
+function estimateFan(player){
+  let f=1;
+  f+=player.flowers.length;
+  f+=player.melds.filter(m=>m.type==='kong').length*2;
+  // 检查是否接近特殊牌型
+  const allTiles=[...player.hand, ...player.melds.flat()];
+  if(allTiles.every(t=>t.suit==='zi')) f+=8;
+  if(allTiles.every(t=>is258(t))) f+=6;
+  return f;
+}
+// AI 选出最该打的牌
+function aiChooseDiscard(player){
+  // 评分每张牌：低分先打
+  const scores=player.hand.map(t=>({t, s:tileScore(player,t)}));
+  scores.sort((a,b)=>a.s-b.s);
+  return scores[0].t;
+}
+function tileScore(player, tile){
+  let score=0;
+  const hand=player.hand;
+  // 同款张数
+  const same=hand.filter(h=>tileKey(h)===tileKey(tile)).length;
+  if(same>=3) score+=20; // 刻
+  else if(same===2) score+=10; // 对
+  // 顺子邻居
+  if(isSuited(tile)){
+    const v=tile.value, s=tile.suit;
+    const has=(val)=>hand.some(h=>h.suit===s&&h.value===val);
+    if(has(v-1)) score+=3; if(has(v+1)) score+=3;
+    if(has(v-2)) score+=1; if(has(v+2)) score+=1;
+    // 258将保留加分
+    if([2,5,8].includes(v)) score+=2;
+  } else {
+    // 字牌单张低分，对子高分
+    if(same===1) score-=2;
+  }
+  return score;
+}
+// AI 决定是否接受碰/吃/杠
+function aiDecideAction(p, options){
+  const player=G.players[p];
+  // 胡：永远接受
+  if(options.some(o=>o.type==='win')) return {type:'win'};
+  // 杠：通常接受（除非自己已听牌且听张为该牌——简化处理为接受）
+  if(options.some(o=>o.type==='kong')){
+    // 已有副露≥2且无听牌时倾向不杠（避免手牌太碎）
+    if(player.melds.length>=3 && !player.isTing) return null;
+    return {type:'kong'};
+  }
+  // 碰：若手牌少于3副露且该牌有利则碰
+  if(options.some(o=>o.type==='pong')){
+    if(player.melds.length<3) return {type:'pong'};
+    // 已听牌则不轻易碰（避免破坏听）
+    if(player.isTing) return null;
+    return {type:'pong'};
+  }
+  // 吃：仅在手牌较弱时
+  if(options.some(o=>o.type==='chi')){
+    if(player.melds.length<2 && !player.isTing) return {type:'chi'};
+    return null;
+  }
+  return null;
+}
+
+/* ============ 十、渲染 ============ */
+function setBtn(name, on){ document.querySelector(`[data-act="${name}"]`).disabled=!on; }
+function clearActionButtons(){
+  ['win','kong','pong','chi','minglou','pass'].forEach(n=>setBtn(n,false));
+  G.pendingSelfWin=null;
+}
+
+function tileHtml(t, size='big', extra=''){
+  if(!t) return '';
+  const cls = t.suit==='zi' ? `honor c-${t.value}` : (t.suit==='hua' ? 'flower c-hua' : `c-${t.suit}`);
+  if(t.suit==='zi'){
+    return `<div class="tile ${size} ${cls} ${extra}">${ZI_NAME[t.value]}</div>`;
+  }
+  if(t.suit==='hua'){
+    return `<div class="tile ${size} ${cls} ${extra}">${HUA_NAME[t.value]}</div>`;
+  }
+  return `<div class="tile ${size} ${cls} ${extra}"><div class="num">${NUM_CN[t.value-1]}</div><div class="suit">${t.suit==='man'?'万':t.suit==='tiao'?'条':'饼'}</div></div>`;
+}
+function backTile(size='sm'){ return `<div class="tile ${size} back"></div>`; }
+
+function render(){
+  for(let i=0;i<4;i++) renderSeat(i);
+  renderCenter();
+  renderRoundInfo();
+}
+
+function renderSeat(i){
+  const p=G.players[i];
+  const el=document.getElementById('seat-'+i);
+  el.classList.toggle('active', G.currentPlayer===i && G.phase!=='over');
+  el.classList.toggle('dealer', p.isDealer);
+  const isTurn = (G.currentPlayer===i && G.phase!=='over');
+  let html=`<div class="flex items-center justify-between mb-1.5">
+    <div class="font-bold text-sm">${p.name}</div>
+    <div class="flex gap-1 items-center">`;
+  if(p.isDealer) html+=`<span class="badge b-ming">庄</span>`;
+  if(p.isTing) html+=`<span class="badge b-ting">听</span>`;
+  if(p.isMinglou) html+=`<span class="badge b-ming">明楼</span>`;
+  if(p.flowers.length) html+=`<span class="badge b-hua">花${p.flowers.length}</span>`;
+  html+=`</div></div>`;
+
+  // 副露
+  if(p.melds.length){
+    html+='<div class="flex gap-1 flex-wrap mb-1.5 justify-center">';
+    p.melds.forEach(m=>{
+      html+=`<div class="meld ${m.type==='kong'?'kong-meld':''}">`;
+      m.tiles.forEach((t,idx)=>{
+        // 明楼时所有牌都亮，碰/吃/杠本来就亮
+        html+=tileHtml(t,'med','');
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
+  // 手牌
+  if(i===0){
+    // 真人：明牌可点击
+    html+='<div class="hand-row">';
+    p.hand.forEach((t,idx)=>{
+      const sel = G.humanSelected===idx ? 'sel-on' : '';
+      const selCls = G.phase==='await-discard' ? 'sel' : '';
+      html+=tileHtml(t,'big',`${selCls} ${sel}`);
+    });
+    html+='</div>';
+  } else if(p.isMinglou){
+    // 明楼：亮牌
+    html+='<div class="hand-row">';
+    p.hand.forEach(t=>html+=tileHtml(t,'med','ming'));
+    html+='</div>';
+  } else {
+    // 暗牌：背面
+    html+='<div class="hand-row">';
+    p.hand.forEach(()=>html+=backTile('med'));
+    html+='</div>';
+  }
+
+  // 弃牌河
+  if(p.discards.length){
+    html+='<div class="flex flex-wrap gap-0.5 mt-1.5 justify-center">';
+    const shown=p.discards.slice(-12);
+    shown.forEach((t,idx)=>{
+      const last = (idx===shown.length-1 && G.lastDiscard && tileKey(t)===tileKey(G.lastDiscard) && G.discardedBy===i) ? 'last' : '';
+      html+=tileHtml(t,'sm',last);
+    });
+    html+='</div>';
+  }
+  el.innerHTML=html;
+
+  // 给真人手牌绑定点击
+  if(i===0){
+    el.querySelectorAll('.tile.sel').forEach((node,idx)=>{
+      node.onclick=()=>onHumanTileClick(idx);
+    });
+  }
+}
+
+function renderCenter(){
+  const el=document.getElementById('pendingTile');
+  if(G.lastDiscard && G.phase!=='over'){
+    el.innerHTML=`<div class="text-xs text-neutral-500 mb-1">${pname(G.discardedBy)} 刚打出</div>`+tileHtml(G.lastDiscard,'big','last');
+  } else {
+    el.innerHTML='';
+  }
+}
+
+function renderRoundInfo(){
+  const el=document.getElementById('roundInfo');
+  el.innerHTML=`
+    <div>第 <b>${G.round}</b> 局 · 庄家 <b>${pname(G.dealer)}</b></div>
+    <div>当前轮：${G.phase==='over'?'-':pname(G.currentPlayer)}</div>
+    <div>牌墙余：<b>${G.wall.length}</b> 张</div>
+    <div>本局分数：${G.roundScores.map((s,i)=>`${pname(i)}${s>0?'+':''}${s}`).join(' / ')}</div>
+  `;
+}
+
+function onHumanTileClick(handIdx){
+  // 仅在「待出牌」阶段允许点牌；响应他人弃牌阶段不允许点手牌
+  if(G.phase!=='await-discard') return;
+  // 第二次点击同一张牌 → 打出
+  if(G.humanSelected===handIdx){
+    const tile=G.players[0].hand[handIdx];
+    G.humanSelected=null;
+    G.pendingSelfWin=null;
+    clearActionButtons();
+    doDiscard(0, tile);
+    return;
+  }
+  G.humanSelected=handIdx;
+  render();
+}
+
+/* ============ 十一、操作按钮事件 ============ */
+document.querySelectorAll('.act-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const act=btn.dataset.act;
+    if(act==='pass'){
+      // 放弃当前操作（resolveAction 内部会调用 nextPlayerDraw）
+      clearActionButtons();
+      if(G.actionResolver){ G.actionResolver('pass'); G.actionResolver=null; }
+      return;
+    }
+    if(act==='minglou'){
+      const p=0; const player=G.players[p];
+      if(player.isTing && !player.isMinglou){
+        player.isMinglou=true;
+        logMsg(`${pname(p)} 明楼！亮牌听张`,'lt-win');
+        render();
+        document.getElementById('actionHint').textContent='已明楼，须自摸胡，得分翻倍';
+        setBtn('minglou',false);
+      }
+      return;
+    }
+    if(act==='kong'){
+      if(G.phase==='await-discard'){
+        // 自己回合的暗杠/补杠
+        const player=G.players[0];
+        const kongable=findKongable(player);
+        if(kongable.length){
+          const k=kongable[0];
+          if(k.kind==='an') doAnKong(0,k);
+          else doBuGang(0,k);
+        }
+      } else if(G.phase==='await-action' && G.actionResolver){
+        clearActionButtons();
+        G.actionResolver('kong');
+        G.actionResolver=null;
+      }
+      return;
+    }
+    if(act==='pong'){
+      if(G.phase==='await-action' && G.actionResolver){
+        clearActionButtons();
+        G.actionResolver('pong'); G.actionResolver=null;
+      }
+      return;
+    }
+    if(act==='chi'){
+      if(G.phase==='await-action' && G.actionResolver){
+        clearActionButtons();
+        G.actionResolver('chi'); G.actionResolver=null;
+      }
+      return;
+    }
+    if(act==='win'){
+      // 两种场景：自摸胡（自己回合）/ 点炮胡（响应他人弃牌）
+      if(G.phase==='await-discard' && G.pendingSelfWin){
+        // 人类自摸胡
+        const pw=G.pendingSelfWin;
+        G.pendingSelfWin=null;
+        clearActionButtons();
+        triggerWin(0, 0, pw.fromKong?'gangshangkaihua':'zimo', pw.win);
+        return;
+      }
+      if(G.phase==='await-action' && G.actionResolver){
+        clearActionButtons();
+        G.actionResolver('win'); G.actionResolver=null;
+      }
+      return;
+    }
+  });
+});
+
+// 顶部按钮
+document.getElementById('btnNewRound').onclick=()=>{
+  if(G.phase==='idle'){
+    G.round=1; newRound(false); // 首局随机定庄
+  } else if(G.phase==='over'){
+    // 尊重连庄/轮庄规则
+    if(G.nextDealer!==undefined){ G.dealer=G.nextDealer; }
+    G.round++;
+    newRound(true);
+  } else {
+    statusMsg('当前对局进行中，请先结束本局');
+  }
+};
+document.getElementById('btnReset').onclick=()=>{
+  initPlayers();
+  G.round=1;G.dealer=0;G.phase='idle';G.wall=[];G.log=[];
+  document.getElementById('log').innerHTML='';
+  for(let i=0;i<4;i++) renderSeat(i);
+  renderCenter();renderRoundInfo();
+  statusMsg('已重置，点击「新一局」开始');
+};
+document.getElementById('btnFriend').onclick=()=>{
+  // 本地模拟：将AI替换为微信好友（仅改名为好友）
+  const idx=1; // 简化替换AI1
+  const old=G.players[idx].name;
+  G.players[idx].name='微信好友·阿强';
+  G.players[idx].isBot=false; // 标记为好友（行为仍走AI逻辑以模拟自动）
+  logMsg(`${old} 退出，微信好友加入`,'lt-sys');
+  render();
+};
+document.getElementById('btnClearLog').onclick=()=>{ G.log=[]; document.getElementById('log').innerHTML=''; };
+
+/* ============ 十二、启动 ============ */
+initPlayers();
+render();
+statusMsg('点击右上角「新一局」开始游戏');
+logMsg('欢迎来到山东济南麻将！','lt-sys');
+logMsg('规则：胡牌须含2/5/8将牌；特殊大胡牌型绕过将牌限制。','lt-sys');
+</script>
+</body>
+</html>
