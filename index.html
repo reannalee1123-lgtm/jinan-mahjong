@@ -6,79 +6,188 @@
 <title>山东济南麻将 · 258将</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  /* ===== 麻将牌通用样式 ===== */
-  .tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:linear-gradient(180deg,#fdfcf7 0%,#efe8d6 100%);
-    border:1px solid #c9bfa6;border-radius:5px 5px 4px 4px;
-    box-shadow:0 2px 3px rgba(0,0,0,.15),inset 0 1px 0 #fff;
-    user-select:none;font-weight:700;cursor:default;line-height:1}
-  .tile.big{width:44px;height:62px}
-  .tile.big .num{font-size:19px}
-  .tile.big .suit{font-size:14px;margin-top:2px}
-  .tile.big.honor{font-size:24px}
-  .tile.big.flower{font-size:21px}
-  .tile.med{width:32px;height:46px}
-  .tile.med .num{font-size:13px}
-  .tile.med .suit{font-size:10px;margin-top:1px}
-  .tile.med.honor{font-size:16px}
-  .tile.med.flower{font-size:14px}
-  .tile.sm{width:26px;height:38px}
-  .tile.sm .num{font-size:11px}
-  .tile.sm .suit{font-size:8px;margin-top:1px}
-  .tile.sm.honor{font-size:13px}
-  .tile.sm.flower{font-size:12px}
-  /* 花色配色 */
-  .c-man{color:#1a1a1a}
-  .c-tiao{color:#2e7d32}
-  .c-bing{color:#1565c0}
-  .c-E{color:#1565c0}.c-S{color:#2e7d32}.c-W{color:#6a1b1a}.c-N{color:#424242}
-  .c-C{color:#c62828}.c-F{color:#2e7d32}.c-P{color:#90a4ae}
-  .c-hua{color:#c2185b}
-  /* 牌背 */
-  .tile.back{background:repeating-linear-gradient(45deg,#3d6b5a,#3d6b5a 4px,#2d5144 4px,#2d5144 8px);
-    border-color:#1f3a30;color:transparent}
-  .tile.back::after{content:'';position:absolute;inset:3px;border:1px solid rgba(255,255,255,.25);border-radius:3px}
-  /* 可交互 */
-  .tile.sel:hover{transform:translateY(-6px);box-shadow:0 8px 12px rgba(0,0,0,.25);cursor:pointer}
-  .tile.sel.sel-on{transform:translateY(-10px);box-shadow:0 10px 16px rgba(0,0,0,.3);outline:2px solid #b8956a}
-  .tile.last{outline:2px solid #c0463a;outline-offset:1px}
-  .tile.ming{outline:2px solid #3d6b5a}
-  /* 横向手牌 */
-  .hand-row{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
-  .meld-row{display:flex;gap:2px}
-  .meld{display:flex;gap:2px;padding:2px 3px;background:rgba(61,107,90,.08);border-radius:5px;border:1px dashed rgba(61,107,90,.3)}
-  /* 玩家区域 */
-  .seat{background:linear-gradient(180deg,#fff,#f7f7f5);border:1px solid #e5e5e0;border-radius:12px;padding:8px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-  .seat.active{border-color:#3d6b5a;box-shadow:0 0 0 2px rgba(61,107,90,.25),0 4px 12px rgba(0,0,0,.08)}
-  .seat.dealer::before{content:'庄';position:absolute;top:-8px;left:-8px;width:20px;height:20px;background:#b8956a;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
-  .badge{display:inline-flex;align-items:center;gap:2px;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600}
-  .b-ting{background:#e8f0ec;color:#2d5144;border:1px solid #3d6b5a}
-  .b-ming{background:#f5efe3;color:#8a6a3a;border:1px solid #b8956a}
-  .b-hua{background:#fce4ec;color:#c2185b;border:1px solid #e91e63}
-  /* 按钮 */
-  .act-btn{padding:8px 14px;border-radius:8px;font-weight:700;font-size:14px;border:1px solid #d0c8b5;background:#fff;color:#1c1c1e;transition:all .12s;cursor:pointer}
-  .act-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.12)}
-  .act-btn:disabled{opacity:.35;cursor:not-allowed}
-  .act-btn.win{background:#c0463a;color:#fff;border-color:#a93a30}
-  .act-btn.kong{background:#b8956a;color:#fff;border-color:#a07a52}
-  .act-btn.pong{background:#3d6b5a;color:#fff;border-color:#2d5144}
-  .act-btn.chi{background:#1565c0;color:#fff;border-color:#0d4f9e}
-  .act-btn.ming{background:#6a1b1a;color:#fff}
-  /* 日志 */
-  #log{font-size:12px;line-height:1.7;color:#4a4a4a;font-family:ui-monospace,Menlo,monospace}
-  #log .lt-self{color:#3d6b5a}
-  #log .lt-win{color:#c0463a;font-weight:700}
-  #log .lt-act{color:#1565c0}
-  #log .lt-sys{color:#b8956a;font-weight:600}
-  /* 弹窗 */
-  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:50}
-  .modal{background:#fff;border-radius:16px;padding:24px;max-width:480px;width:92%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-  /* 杠竖排 */
-  .meld.kong-meld .tile.med:nth-child(4){transform:translate(-12px,-10px) rotate(0);margin-right:-12px}
-  .meld.kong-meld{padding-right:6px}
-  /* 旋转区域 */
-  .rot-l{transform:rotate(0)}
-  .player-info{font-size:12px}
+/* ========== 深绿麻将桌 · 中式麻将牌面 ========== */
+body{background:#1a1a1c}
+
+/* 麻将桌：深绿色 + 木边框 */
+.mahjong-table{
+  background: radial-gradient(ellipse at center, #1a5c3a 0%, #0e3d26 80%);
+  border: 12px solid #5c3a1a;
+  border-radius: 20px;
+  box-shadow: inset 0 0 40px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.5);
+  position: relative;
+  overflow: hidden;
+  min-height: 640px;
+}
+.mahjong-table::before{
+  content:'';position:absolute;inset:8px;border:2px solid rgba(255,220,150,.25);border-radius:14px;pointer-events:none}
+
+/* 桌面中央出牌区 */
+#centerDiscard{
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,220,150,.3);
+  border-radius: 10px;
+  padding: 8px;
+  min-height: 120px;
+  display: flex; flex-wrap: wrap; gap: 3px;
+  justify-content: center; align-content: flex-start;
+  position: relative;
+}
+#centerDiscard .discard-label{
+  position:absolute; top:2px; left:6px;
+  font-size:10px; color:rgba(255,220,150,.6); letter-spacing:1px;
+}
+
+/* ===== 麻将牌 3D 质感 ===== */
+.tile{
+  position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background: linear-gradient(180deg, #faf6ed 0%, #e8dec8 40%, #d4c7a8 100%);
+  border-radius: 4px 4px 3px 3px;
+  /* 立体厚度：顶-中-底三层阴影 */
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,.8) inset,  /* 顶部高光 */
+    0 2px 0 rgba(0,0,0,.25),              /* 底部厚度1 */
+    0 4px 2px rgba(0,0,0,.2),              /* 底部厚度2 */
+    0 0 0 1px #8a7a58,                    /* 边框线 */
+    0 6px 8px rgba(0,0,0,.4);             /* 落地阴影 */
+  user-select:none; cursor:default; line-height:1;
+  overflow:hidden;
+}
+/* 牌面内凹效果 */
+.tile::before{
+  content:'';position:absolute;
+  inset: 3px 3px 5px 3px;
+  background: linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0));
+  border-radius: 3px 3px 2px 2px;
+  pointer-events:none;
+}
+
+/* 尺寸 */
+.tile.big{ width:52px; height:72px; }
+.tile.med{ width:36px; height:50px; }
+.tile.sm{ width:28px; height:40px; }
+
+/* 花色 SVG 容器 */
+.tile .face-svg{ position:relative; z-index:2; display:flex; align-items:center; justify-content:center; }
+.tile.big .face-svg{ width:44px; height:60px; }
+.tile.med .face-svg{ width:30px; height:42px; }
+.tile.sm .face-svg{ width:22px; height:34px; }
+
+/* 牌背 */
+.tile.back{
+  background:
+    linear-gradient(180deg, #3d6b5a, #1f3a30);
+  border: 1px solid #0d2418;
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,.15) inset,
+    0 2px 0 rgba(0,0,0,.25), 0 4px 2px rgba(0,0,0,.2),
+    0 0 0 1px #0d2418, 0 6px 8px rgba(0,0,0,.4);
+  color: transparent;
+}
+.tile.back::after{
+  content:'';position:absolute;inset:4px;border:1px solid rgba(255,220,150,.3);
+  border-radius:3px;
+  background: repeating-linear-gradient(45deg, rgba(255,220,150,.08), rgba(255,220,150,.08) 3px, transparent 3px, transparent 6px);
+}
+
+/* 可交互状态 */
+.tile.sel{ cursor:pointer; }
+.tile.sel:hover{ transform:translateY(-5px); box-shadow:0 -1px 0 rgba(255,255,255,.8) inset,0 2px 0 rgba(0,0,0,.2),0 6px 4px rgba(0,0,0,.2),0 0 0 1px #8a7a58,0 12px 18px rgba(0,0,0,.5); }
+.tile.sel.sel-on{ transform:translateY(-12px); box-shadow:0 -1px 0 rgba(255,255,255,.8) inset,0 2px 0 rgba(0,0,0,.2),0 8px 4px rgba(0,0,0,.2),0 0 0 1px #b8956a,0 16px 24px rgba(184,149,106,.35); outline:2px solid #b8956a; outline-offset:0; }
+.tile.last{ box-shadow:0 -1px 0 rgba(255,255,255,.8) inset,0 2px 0 rgba(0,0,0,.2),0 4px 2px rgba(0,0,0,.2),0 0 0 1px #c0463a,0 6px 16px rgba(192,70,58,.5); }
+.tile.ming{ box-shadow:0 -1px 0 rgba(255,255,255,.8) inset,0 2px 0 rgba(0,0,0,.2),0 4px 2px rgba(0,0,0,.2),0 0 0 1px #3d6b5a,0 6px 12px rgba(61,107,90,.4); }
+
+/* 摸牌动画 */
+.tile.draw-in{ animation: drawPop .35s ease-out; }
+@keyframes drawPop{
+  from{ transform:translateY(60px) scale(.6); opacity:0; box-shadow:0 0 0 rgba(0,0,0,0); }
+  to  { transform:translateY(0) scale(1); opacity:1; }
+}
+.tile.flip-in{ animation: flipPop .4s ease-out; }
+@keyframes flipPop{
+  from{ transform:scale(.4); opacity:0; }
+  to  { transform:scale(1); opacity:1; }
+}
+
+/* ===== 玩家方位区域 ===== */
+.seat{
+  background: rgba(0,0,0,.15);
+  border: 1px solid rgba(255,220,150,.25);
+  border-radius: 10px;
+  padding: 8px;
+  position: relative;
+}
+.seat.active{
+  border-color: #b8956a;
+  box-shadow: 0 0 0 2px rgba(184,149,106,.35), 0 0 20px rgba(184,149,106,.15);
+}
+.seat.dealer::before{
+  content:'庄'; position:absolute; top:-10px; left:-10px; z-index:3;
+  width:22px; height:22px; background:#b8956a; color:#1a1a1c;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,.5);
+}
+.seat .seat-name{ color:#f5efe3; font-weight:700; font-size:14px; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+
+.badge{ display:inline-flex; align-items:center; gap:2px; font-size:10px; padding:1px 6px; border-radius:8px; font-weight:600; }
+.b-ting{ background:#b8956a; color:#1a1a1c; }
+.b-ming{ background:#c0463a; color:#fff; }
+.b-hua{ background:#e91e63; color:#fff; }
+
+/* ===== 牌墙 ===== */
+.wall-row{ display:flex; gap:2px; flex-wrap:nowrap; }
+.wall-row .tile.back{ margin-right:-8px; }
+
+/* 玩家手牌 */
+.hand-row{ display:flex; gap:3px; flex-wrap:nowrap; justify-content:center; position:relative; z-index:2; }
+
+/* 副露 */
+.meld{ display:flex; gap:1px; padding:3px 3px 3px 3px; background: rgba(0,0,0,.35); border-radius:5px; border: 1px solid rgba(255,220,150,.2); }
+.meld.kong-meld .tile.med:nth-child(4){ transform:translate(-12px,-10px) rotate(0); margin-right:-14px; }
+.meld.kong-meld{ padding-right:8px; }
+.meld.kong-meld .tile.med:nth-child(5){ transform:translate(-12px,-20px) rotate(0); margin-right:-14px; }
+
+/* ===== 右侧面板保留原有样式 ===== */
+#centerStatus{ color:#f5efe3 !important; }
+.act-btn{ padding:8px 14px; border-radius:8px; font-weight:700; font-size:14px; border:1px solid #d0c8b5; background:#fff; color:#1c1c1e; transition:all .12s; cursor:pointer; }
+.act-btn:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,.12); }
+.act-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.act-btn.win{ background:#c0463a; color:#fff; border-color:#a93a30; }
+.act-btn.kong{ background:#b8956a; color:#fff; border-color:#a07a52; }
+.act-btn.pong{ background:#3d6b5a; color:#fff; border-color:#2d5144; }
+.act-btn.chi{ background:#1565c0; color:#fff; border-color:#0d4f9e; }
+.act-btn.ming{ background:#6a1b1a; color:#fff; }
+
+#log{ font-size:12px; line-height:1.7; color:#4a4a4a; font-family:ui-monospace,Menlo,monospace; }
+#log .lt-self{ color:#3d6b5a; }
+#log .lt-win{ color:#c0463a; font-weight:700; }
+#log .lt-act{ color:#1565c0; }
+#log .lt-sys{ color:#b8956a; font-weight:600; }
+
+.modal-mask{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
+.modal{ background:#fff; border-radius:16px; padding:24px; max-width:480px; width:92%; max-height:88vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+
+/* 玩家副露区 */
+.meld-area{ display:flex; gap:4px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+
+/* 桌面中央状态提示 */
+#centerStatusBox{
+  color:#f5efe3; font-weight:600; font-size:13px;
+  text-shadow:0 2px 4px rgba(0,0,0,.6);
+  text-align:center; padding:4px;
+}
+
+/* 牌墙牌 */
+.wall-tile{ margin-right:-10px; }
+.wall-tile:first-child{ margin-right:-10px; margin-left:4px; }
+
+/* 顶部玩家信息区横排 */
+.seat-top-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:6px; }
+.seat-top-row .info-left{ display:flex; gap:4px; align-items:center; }
+.seat-top-row .info-right{ display:flex; gap:3px; align-items:center; }
+
+/* 右/左玩家竖排手牌 */
+.side-hand{ display:flex; flex-direction:column; gap:2px; align-items:center; }
 </style>
 </head>
 <body class="bg-neutral-800 text-neutral-900 min-h-screen">
@@ -99,22 +208,29 @@
 <!-- 主棋盘 -->
 <main class="max-w-[1400px] mx-auto p-4 grid grid-cols-[1fr_280px] gap-4">
 
-  <!-- 左：棋盘 -->
-  <section class="bg-[#f0ebe0] rounded-xl p-3 shadow-inner" style="min-height:640px">
-    <!-- 顶部玩家2 -->
+  <!-- 左：深绿麻将桌 -->
+  <section class="mahjong-table p-3 relative">
+    <!-- 顶部玩家2（对家） -->
     <div class="flex justify-center mb-2">
-      <div id="seat-2" class="seat relative" style="width:520px"></div>
+      <div id="seat-2" class="seat relative" style="width:540px"></div>
     </div>
 
-    <!-- 中部：左玩家 + 桌面中心 + 右玩家 -->
-    <div class="flex items-center justify-between gap-2 my-2">
-      <div id="seat-3" class="seat relative" style="width:240px"></div>
-      <div id="center" class="flex-1 bg-[#e6dfca] rounded-lg p-3 min-h-[180px] flex flex-col items-center justify-center gap-2">
-        <div class="text-xs text-neutral-500" id="centerStatus">点击「新一局」开始</div>
-        <div id="discardPool" class="flex flex-wrap gap-1 justify-center max-w-md"></div>
+    <!-- 中部：左玩家(西) + 桌面中心(东) + 右玩家 -->
+    <div class="flex items-stretch gap-2 my-2">
+      <div id="seat-3" class="seat relative" style="width:230px"></div>
+      <!-- 桌面中央：出牌区 + 牌墙 + 状态 -->
+      <div class="flex-1 flex flex-col items-center justify-center gap-2">
+        <div id="centerStatusBox">点击「新一局」开始</div>
+        <!-- 牌墙（背面） -->
+        <div id="wallArea" class="flex gap-0 flex-wrap" style="min-height:30px"></div>
+        <!-- 中央出牌区 -->
+        <div id="centerDiscard" class="w-full" style="min-height:100px">
+          <span class="discard-label">出牌区 · 所有玩家</span>
+          <div id="discardPool" class="flex flex-wrap gap-1 justify-center"></div>
+        </div>
         <div id="pendingTile" class="mt-1"></div>
       </div>
-      <div id="seat-1" class="seat relative" style="width:240px"></div>
+      <div id="seat-1" class="seat relative" style="width:230px"></div>
     </div>
 
     <!-- 底部玩家0（真人） -->
@@ -391,7 +507,7 @@ function logMsg(msg, cls=''){
   el.innerHTML += `<div class="${cls}">${msg}</div>`;
   el.scrollTop=el.scrollHeight;
 }
-function statusMsg(msg){ document.getElementById('centerStatus').textContent=msg; }
+function statusMsg(msg){ const el=document.getElementById('centerStatusBox'); if(el) el.textContent=msg; }
 
 // 初始化玩家
 function initPlayers(){
@@ -994,16 +1110,118 @@ function clearActionButtons(){
   G.pendingSelfWin=null;
 }
 
+/* ===== 传统麻将牌面 SVG ===== */
+// 每个 size 对应 viewBox
+const TILE_VB = { big:'0 0 52 72', med:'0 0 36 50', sm:'0 0 28 40' };
+
+// 万子：中心大字 + 角标数字
+function svgMan(val, size){
+  const vb=TILE_VB[size];
+  const n=['一','二','三','四','五','六','七','八','九'][val-1];
+  // 万子字体颜色：传统黑色 + 角标红色
+  return `<svg viewBox="${vb}" class="face-svg">
+    <text x="50%" y="48%" text-anchor="middle" dominant-baseline="middle" font-size="${size==='big'?26:size==='med'?18:14}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="800" fill="#1a1a1a">${n}</text>
+    <text x="50%" y="78%" text-anchor="middle" font-size="${size==='big'?13:size==='med'?9:7}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">万</text>
+    <text x="10%" y="18%" text-anchor="middle" font-size="${size==='big'?9:size==='med'?6:5}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">${val}</text>
+    <text x="90%" y="92%" text-anchor="middle" font-size="${size==='big'?9:size==='med'?6:5}" font-family="'KaiTi','STKaiti','SimSun',serif" font-weight="700" fill="#c62828">${val}</text>
+  </svg>`;
+}
+// 条子：竹节纵向排列
+function svgTiao(val, size){
+  const vb=TILE_VB[size];
+  const sw=size==='big'?2.5:size==='med'?1.8:1.3;
+  const topGap=size==='big'?8:size==='med'?5:4;
+  const cx=50;
+  const baseY=size==='big'?62:size==='med'?43:34;
+  const gapY=size==='big'?10:size==='med'?7:5.5;
+  if(val===1){
+    return `<svg viewBox="${vb}" class="face-svg">
+      <ellipse cx="${cx}" cy="38" rx="14" ry="10" fill="#2e7d32"/>
+      <path d="M${cx-14} 38 Q${cx-20} 45 ${cx-10} 55 Q${cx-5} 48 ${cx} 44" stroke="#2e7d32" stroke-width="2.5" fill="none"/>
+      <circle cx="${cx+8}" cy="33" r="2.5" fill="#fff"/>
+      <circle cx="${cx+8}" cy="33" r="1.2" fill="#1a1a1a"/>
+      <path d="M${cx+12} 36 L${cx+18} 34 L${cx+12} 38" fill="#ff9800"/>
+    </svg>`;
+  }
+  const cols={2:2,3:3,4:2,5:2,6:3,7:3,8:3,9:3};
+  const rows={2:1,3:1,4:2,5:2,6:2,7:2,8:3,9:3};
+  const p={2:[0,1],3:[0,1,2],4:[0,0,1,1],5:[0,0,1,1,2],6:[0,1,2,0,1],7:[0,1,2,0,1,2],8:[0,1,2,0,1,2,0],9:[0,1,2,0,1,2,0,1,2]};
+  const C=cols[val], R=rows[val], pos=p[val];
+  let circles='';
+  for(let i=0;i<val;i++){
+    const row=pos[i]; const col=i%C;
+    const totalW=C*(sw*3); const startX=cx-totalW/2+sw*1.5;
+    const yBot=baseY-(R-1)*gapY;
+    const y=yBot+row*gapY;
+    const x=startX+col*(sw*3);
+    circles += `<line x1="${x}" y1="${y-topGap}" x2="${x}" y2="${y+topGap}" stroke="#2e7d32" stroke-width="${sw}" stroke-linecap="round"/>`;
+    circles += `<line x1="${x-sw*1.5}" y1="${y-topGap-1}" x2="${x+sw*1.5}" y2="${y-topGap-1}" stroke="#1b5e20" stroke-width="${sw*0.7}" stroke-linecap="round"/>`;
+    circles += `<line x1="${x-sw*1.5}" y1="${y+topGap+1}" x2="${x+sw*1.5}" y2="${y+topGap+1}" stroke="#1b5e20" stroke-width="${sw*0.7}" stroke-linecap="round"/>`;
+  }
+  return `<svg viewBox="${vb}" class="face-svg">${circles}</svg>`;
+}
+// 饼子：圆圈点阵
+function svgBing(val, size){
+  const vb=TILE_VB[size];
+  const r=size==='big'?5:size==='med'?3.5:2.5;
+  const gap=size==='big'?10:size==='med'?7:5.5;
+  const positions={
+    1:[[0,0]],
+    2:[[-1,-1],[1,1]],
+    3:[[-1,-1],[0,0],[1,1]],
+    4:[[-1,-1],[1,-1],[-1,1],[1,1]],
+    5:[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
+    6:[[-1,-1],[0,-1],[1,-1],[-1,1],[0,1],[1,1]],
+    7:[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[-1,1],[0,1]],
+    8:[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]],
+    9:[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]],
+  };
+  const centers=positions[val];
+  let circles='';
+  centers.forEach(([dx,dy])=>{
+    const x=50+dx*gap; const y=(size==='big'?30:size==='med'?21:17)+dy*gap*0.85;
+    circles += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#1565c0" stroke-width="${size==='big'?2:1.4}"/>`;
+    circles += `<circle cx="${x}" cy="${y}" r="${r*0.45}" fill="#1565c0"/>`;
+  });
+  return `<svg viewBox="${vb}" class="face-svg">${circles}</svg>`;
+}
+// 字牌
+const HONOR_SVG={
+  'E':'东','S':'南','W':'西','N':'北','C':'中','F':'發','P':'白'
+};
+const HONOR_COLOR={'E':'#1565c0','S':'#2e7d32','W':'#6a1b1a','N':'#424242','C':'#c62828','F':'#2e7d32','P':'#546e7a'};
+function svgHonor(val, size){
+  const vb=TILE_VB[size];
+  const n=HONOR_SVG[val]; const c=HONOR_COLOR[val]||'#1a1a1a';
+  const fs=size==='big'?36:size==='med'?24:18;
+  return `<svg viewBox="${vb}" class="face-svg">
+    <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="${fs}" font-family="'KaiTi','STKaiti','SimHei',serif" font-weight="800" fill="${c}">${n}</text>
+  </svg>`;
+}
+// 花牌
+const HUA_EMOJI={spring:'🌸',summer:'☀️',autumn:'🍁',winter:'❄️',plum:'🍃',orchid:'🌿',bamboo:'🎋',chrysanthemum:'🌼'};
+function svgFlower(val, size){
+  const vb=TILE_VB[size];
+  const e=HUA_EMOJI[val]||'🌺';
+  const fs=size==='big'?30:size==='med'?20:15;
+  const label={'spring':'春','summer':'夏','autumn':'秋','winter':'冬','plum':'梅','orchid':'兰','bamboo':'竹','chrysanthemum':'菊'}[val];
+  return `<svg viewBox="${vb}" class="face-svg">
+    <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle" font-size="${fs}">${e}</text>
+    <text x="50%" y="82%" text-anchor="middle" dominant-baseline="middle" font-size="${size==='big'?11:size==='med'?7:6}" font-family="'KaiTi',serif" font-weight="700" fill="#c2185b">${label}</text>
+  </svg>`;
+}
+
+/* ===== 牌面渲染主函数 ===== */
 function tileHtml(t, size='big', extra=''){
   if(!t) return '';
-  const cls = t.suit==='zi' ? `honor c-${t.value}` : (t.suit==='hua' ? 'flower c-hua' : `c-${t.suit}`);
-  if(t.suit==='zi'){
-    return `<div class="tile ${size} ${cls} ${extra}">${ZI_NAME[t.value]}</div>`;
-  }
-  if(t.suit==='hua'){
-    return `<div class="tile ${size} ${cls} ${extra}">${HUA_NAME[t.value]}</div>`;
-  }
-  return `<div class="tile ${size} ${cls} ${extra}"><div class="num">${NUM_CN[t.value-1]}</div><div class="suit">${t.suit==='man'?'万':t.suit==='tiao'?'条':'饼'}</div></div>`;
+  let svg='';
+  if(t.suit==='man') svg=svgMan(t.value, size);
+  else if(t.suit==='tiao') svg=svgTiao(t.value, size);
+  else if(t.suit==='bing') svg=svgBing(t.value, size);
+  else if(t.suit==='zi') svg=svgHonor(t.value, size);
+  else if(t.suit==='hua') svg=svgFlower(t.value, size);
+  else return `<div class="tile ${size} ${extra}"></div>`;
+  return `<div class="tile ${size} ${extra}">${svg}</div>`;
 }
 function backTile(size='sm'){ return `<div class="tile ${size} back"></div>`; }
 
@@ -1018,11 +1236,11 @@ function renderSeat(i){
   const el=document.getElementById('seat-'+i);
   el.classList.toggle('active', G.currentPlayer===i && G.phase!=='over');
   el.classList.toggle('dealer', p.isDealer);
-  const isTurn = (G.currentPlayer===i && G.phase!=='over');
-  let html=`<div class="flex items-center justify-between mb-1.5">
-    <div class="font-bold text-sm">${p.name}</div>
-    <div class="flex gap-1 items-center">`;
+  let html=`<div class="seat-top-row">
+    <div class="info-left">
+      <span class="seat-name">${p.name}</span>`;
   if(p.isDealer) html+=`<span class="badge b-ming">庄</span>`;
+  html+=`</div><div class="info-right">`;
   if(p.isTing) html+=`<span class="badge b-ting">听</span>`;
   if(p.isMinglou) html+=`<span class="badge b-ming">明楼</span>`;
   if(p.flowers.length) html+=`<span class="badge b-hua">花${p.flowers.length}</span>`;
@@ -1030,13 +1248,10 @@ function renderSeat(i){
 
   // 副露
   if(p.melds.length){
-    html+='<div class="flex gap-1 flex-wrap mb-1.5 justify-center">';
+    html+='<div class="meld-area">';
     p.melds.forEach(m=>{
       html+=`<div class="meld ${m.type==='kong'?'kong-meld':''}">`;
-      m.tiles.forEach((t,idx)=>{
-        // 明楼时所有牌都亮，碰/吃/杠本来就亮
-        html+=tileHtml(t,'med','');
-      });
+      m.tiles.forEach(t=>html+=tileHtml(t,'med',''));
       html+='</div>';
     });
     html+='</div>';
@@ -1044,7 +1259,6 @@ function renderSeat(i){
 
   // 手牌
   if(i===0){
-    // 真人：明牌可点击
     html+='<div class="hand-row">';
     p.hand.forEach((t,idx)=>{
       const sel = G.humanSelected===idx ? 'sel-on' : '';
@@ -1053,30 +1267,16 @@ function renderSeat(i){
     });
     html+='</div>';
   } else if(p.isMinglou){
-    // 明楼：亮牌
     html+='<div class="hand-row">';
     p.hand.forEach(t=>html+=tileHtml(t,'med','ming'));
     html+='</div>';
   } else {
-    // 暗牌：背面
     html+='<div class="hand-row">';
     p.hand.forEach(()=>html+=backTile('med'));
     html+='</div>';
   }
 
-  // 弃牌河
-  if(p.discards.length){
-    html+='<div class="flex flex-wrap gap-0.5 mt-1.5 justify-center">';
-    const shown=p.discards.slice(-12);
-    shown.forEach((t,idx)=>{
-      const last = (idx===shown.length-1 && G.lastDiscard && tileKey(t)===tileKey(G.lastDiscard) && G.discardedBy===i) ? 'last' : '';
-      html+=tileHtml(t,'sm',last);
-    });
-    html+='</div>';
-  }
   el.innerHTML=html;
-
-  // 给真人手牌绑定点击
   if(i===0){
     el.querySelectorAll('.tile.sel').forEach((node,idx)=>{
       node.onclick=()=>onHumanTileClick(idx);
@@ -1085,12 +1285,38 @@ function renderSeat(i){
 }
 
 function renderCenter(){
-  const el=document.getElementById('pendingTile');
-  if(G.lastDiscard && G.phase!=='over'){
-    el.innerHTML=`<div class="text-xs text-neutral-500 mb-1">${pname(G.discardedBy)} 刚打出</div>`+tileHtml(G.lastDiscard,'big','last');
-  } else {
-    el.innerHTML='';
+  // 中央出牌池：所有玩家打出的牌统一放在这里，按出牌顺序
+  const pool=document.getElementById('discardPool');
+  let html='';
+  for(let i=0;i<4;i++){
+    const d=G.players[i].discards;
+    d.forEach((t,idx)=>{
+      const isLast = (i===G.discardedBy && idx===d.length-1 && G.lastDiscard && tileKey(t)===tileKey(G.lastDiscard));
+      const cls=isLast?'last':'';
+      html+=tileHtml(t,'sm',cls);
+    });
   }
+  pool.innerHTML=html;
+
+  // 牌墙（背面堆）
+  const wall=document.getElementById('wallArea');
+  if(wall){
+    let wh='';
+    // 码牌：每列4张背牌
+    const colCount=Math.min(12, Math.ceil(G.wall.length/4));
+    for(let c=0;c<colCount;c++){
+      wh+='<div class="wall-row flex-col" style="gap:0;margin-right:-14px">';
+      for(let r=0;r<Math.min(4,G.wall.length-c*4);r++){
+        wh+=backTile('med');
+      }
+      wh+='</div>';
+    }
+    wall.innerHTML=wh;
+  }
+
+  // 状态提示
+  const st=document.getElementById('centerStatusBox');
+  if(st) statusMsg(st.textContent || '点击「新一局」开始');
 }
 
 function renderRoundInfo(){
